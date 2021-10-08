@@ -1,1 +1,5 @@
-message: "&cYou can't trade with villagers on this server."
+message:
+  enabled: true
+  context: "&cYou can't trade with villagers on this server."
+disabled-worlds:
+  - example-world
