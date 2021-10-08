@@ -1,0 +1,8 @@
+name: DisableTrade
+version: '${project.version}'
+main: me.dodo.disabletrade.DisableTrade
+api-version: 1.16
+prefix: DisableTrade
+authors: [ dodo ]
+description: Disables villager trade.
+website: https://github.com/dodoflix
