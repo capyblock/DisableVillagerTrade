@@ -6,3 +6,7 @@ prefix: DisableTrade
 authors: [ dodo ]
 description: Disables villager trade.
 website: https://github.com/dodoflix
+
+permissions:
+  disabletrade.bypass:
+    description: "The player with this permission can trade with villagers."
