@@ -1,6 +1,6 @@
 name: DisableTrade
 version: '${project.version}'
-main: me.dodo.disabletrade.DisableTrade
+main: me.dodo.disabletrade.DisableVillagerTrade
 api-version: 1.16
 prefix: DisableTrade
 authors: [ dodo ]
