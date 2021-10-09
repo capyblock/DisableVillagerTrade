@@ -1,9 +1,9 @@
-package me.dodo.disabletrade;
+package me.dodo.disablevillagertrade;
 
-import me.dodo.disabletrade.events.PlayerInteractEntity;
+import me.dodo.disablevillagertrade.events.PlayerInteractEntity;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class DisableTrade extends JavaPlugin {
+public final class DisableVillagerTrade extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();

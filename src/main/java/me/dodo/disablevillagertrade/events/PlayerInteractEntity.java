@@ -1,6 +1,6 @@
-package me.dodo.disabletrade.events;
+package me.dodo.disablevillagertrade.events;
 
-import me.dodo.disabletrade.DisableTrade;
+import me.dodo.disablevillagertrade.DisableVillagerTrade;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Villager;
@@ -13,11 +13,11 @@ import java.util.List;
 import java.util.Objects;
 
 public class PlayerInteractEntity implements Listener {
-    private static DisableTrade plugin;
+    private static DisableVillagerTrade plugin;
     private static String message;
     private static List<String> disabledWorlds = new ArrayList<>();
 
-    public PlayerInteractEntity(DisableTrade _plugin) {
+    public PlayerInteractEntity(DisableVillagerTrade _plugin) {
         plugin = _plugin;
         if (plugin.getConfig().getBoolean("message.enabled"))
             message = ChatColor.translateAlternateColorCodes('&', Objects.requireNonNull(plugin.getConfig().getString("message.context")));

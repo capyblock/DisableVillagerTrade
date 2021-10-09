@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>me.dodo</groupId>
-    <artifactId>disabletrade</artifactId>
-    <version>1.2</version>
+    <artifactId>disablevillagertrade</artifactId>
+    <version>1.2.1</version>
     <packaging>jar</packaging>
 
-    <name>DisableTrade</name>
+    <name>DisableVillagerTrade</name>
 
     <description>Disables villager trade.</description>
     <properties>
