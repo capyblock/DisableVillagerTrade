@@ -1,4 +1,4 @@
-# DisableTrade
+# Disable Villager Trade
 Disable villager trade on your server!
 
 # Spigot Page
