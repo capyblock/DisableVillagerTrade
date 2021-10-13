@@ -1,7 +1,6 @@
 name: DisableVillagerTrade
 version: '${project.version}'
 main: me.dodo.disablevillagertrade.DisableVillagerTrade
-api-version: 1.16
 prefix: DisableVillagerTrade
 authors: [ dodo ]
 description: Disable villager trade.
