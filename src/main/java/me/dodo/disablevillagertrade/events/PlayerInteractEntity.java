@@ -28,12 +28,14 @@ public class PlayerInteractEntity implements Listener {
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
         if (event.getRightClicked().getType() != EntityType.VILLAGER)
             return;
+        Villager villager = (Villager) event.getRightClicked();
+        if (villager.getProfession() == Villager.Profession.NONE)
+            return;
         if (disabledWorlds.contains(event.getPlayer().getWorld().getName()))
             return;
         if (event.getPlayer().hasPermission("disabletrade.bypass"))
             return;
 
-        Villager villager = (Villager) event.getRightClicked();
         if (villager.hasAI()) {
             if (plugin.getConfig().getBoolean("message.enabled"))
                 event.getPlayer().sendMessage(message);
