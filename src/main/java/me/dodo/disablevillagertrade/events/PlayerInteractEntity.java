@@ -1,6 +1,8 @@
 package me.dodo.disablevillagertrade.events;
 
 import me.dodo.disablevillagertrade.DisableVillagerTrade;
+import me.dodo.disablevillagertrade.settings.ConfigManager;
+import me.dodo.disablevillagertrade.settings.configurations.Main;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Villager;
@@ -8,20 +10,12 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-
 public class PlayerInteractEntity implements Listener {
-    private static DisableVillagerTrade plugin;
-    private static String message;
-    private static List<String> disabledWorlds = new ArrayList<>();
+    private static Main main;
 
-    public PlayerInteractEntity(DisableVillagerTrade _plugin) {
-        plugin = _plugin;
-        if (plugin.getConfig().getBoolean("message.enabled"))
-            message = ChatColor.translateAlternateColorCodes('&', Objects.requireNonNull(plugin.getConfig().getString("message.context")));
-        disabledWorlds = (List<String>) _plugin.getConfig().getList("disabled-worlds");
+    public PlayerInteractEntity() {
+        ConfigManager configManager = DisableVillagerTrade.getConfigManager();
+        main = configManager.getMain();
     }
 
     @EventHandler
@@ -31,14 +25,14 @@ public class PlayerInteractEntity implements Listener {
         Villager villager = (Villager) event.getRightClicked();
         if (villager.getProfession() == Villager.Profession.NONE)
             return;
-        if (disabledWorlds.contains(event.getPlayer().getWorld().getName()))
+        if(main.getDisabledWorlds().contains(event.getPlayer().getWorld().getName()))
             return;
         if (event.getPlayer().hasPermission("disabletrade.bypass"))
             return;
 
-        if (villager.hasAI()) {
-            if (plugin.getConfig().getBoolean("message.enabled"))
-                event.getPlayer().sendMessage(message);
+        if (villager.hasAI() && villager.hasGravity()) {
+            if (main.isEnabled())
+                event.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&', main.getContext()));
             event.setCancelled(true);
         }
     }
