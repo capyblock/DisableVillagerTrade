@@ -1,13 +1,13 @@
 package me.dodo.disablevillagertrade.settings;
 
 import me.dodo.disablevillagertrade.settings.configurations.Main;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Objects;
 
@@ -30,7 +30,8 @@ public class ConfigManager {
         }
         try {
             YamlConfiguration yamlConfiguration = new YamlConfiguration();
-            yamlConfiguration.loadFromString(FileUtils.readFileToString(this.configFile, "UTF-8"));
+            String content = new String(Files.readAllBytes(this.configFile.toPath()), StandardCharsets.UTF_8);
+            yamlConfiguration.loadFromString(content);
             this.main = new Main() {
                 @Override
                 public boolean isEnabled() {
@@ -66,9 +67,13 @@ public class ConfigManager {
             e.printStackTrace();
             return;
         }
-        try (BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(this.configFile))) {
+        try (BufferedWriter bufferedWriter = Files.newBufferedWriter(this.configFile.toPath(), StandardCharsets.UTF_8)) {
             assert inputStream != null;
-            IOUtils.copy(inputStream, bufferedWriter, "UTF-8");
+            byte[] buffer = new byte[inputStream.available()];
+            int length;
+            while ((length = inputStream.read(buffer)) != -1) {
+                bufferedWriter.write(new String(buffer, 0, length, StandardCharsets.UTF_8));
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
