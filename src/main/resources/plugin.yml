@@ -2,8 +2,9 @@ name: DisableVillagerTrade
 version: '${project.version}'
 main: me.dodo.disablevillagertrade.DisableVillagerTrade
 prefix: DisableVillagerTrade
+api-version: '1.14'
 authors: [ dodo ]
-description: Disable villager trade.
+description: Disable villager trade. Supports Minecraft 1.14 - 1.21.4+
 website: https://github.com/dodoflix/DisableVillagerTrade
 
 permissions:
