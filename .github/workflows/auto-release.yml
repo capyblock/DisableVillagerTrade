@@ -164,34 +164,35 @@ jobs:
           BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
           IS_PRODUCTION="${{ steps.release_type.outputs.is_production }}"
           
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
-          MAJOR=${VERSION_PARTS[0]:-0}
-          MINOR=${VERSION_PARTS[1]:-0}
-          PATCH=${VERSION_PARTS[2]:-0}
-          
-          case $BUMP_TYPE in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-          
-          BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          
           if [ "$IS_PRODUCTION" = "true" ]; then
-            NEW_VERSION="$BASE_VERSION"
+            # Only bump version on production releases
+            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+            MAJOR=${VERSION_PARTS[0]:-0}
+            MINOR=${VERSION_PARTS[1]:-0}
+            PATCH=${VERSION_PARTS[2]:-0}
+            
+            case $BUMP_TYPE in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            BASE_VERSION="$NEW_VERSION"
           else
-            # Dev builds get commit count suffix
+            # Dev builds use current version with -dev suffix (no bump)
             COMMIT_COUNT=$(git rev-list --count HEAD)
-            NEW_VERSION="${BASE_VERSION}-dev.${COMMIT_COUNT}"
+            NEW_VERSION="${CURRENT}-dev.${COMMIT_COUNT}"
+            BASE_VERSION="$CURRENT"
           fi
           
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -267,17 +268,13 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
-      # Commit version bump for both production and develop
+      # Only commit version bump for production releases
       - name: Commit version bump
+        if: steps.release_type.outputs.is_production == 'true'
         run: |
           git add gradle.properties
-          BRANCH="${{ steps.release_type.outputs.branch }}"
-          if [ "${{ steps.release_type.outputs.is_production }}" = "true" ]; then
-            git commit -m "chore: release v${{ steps.new_version.outputs.new_version }} [skip ci]"
-          else
-            git commit -m "chore: dev build v${{ steps.new_version.outputs.new_version }} [skip ci]"
-          fi
-          git push origin $BRANCH
+          git commit -m "chore: release v${{ steps.new_version.outputs.new_version }} [skip ci]"
+          git push origin master
 
       - name: Collect artifacts
         id: artifacts
