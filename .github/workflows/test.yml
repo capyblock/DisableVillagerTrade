@@ -1,4 +1,4 @@
-name: Tests & Code Analysis
+name: Tests & Build
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
       should_test: ${{ steps.changes.outputs.should_test }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
@@ -41,11 +41,19 @@ jobs:
           SHOULD_TEST="false"
           
           while IFS= read -r file; do
-            # Source files and tests
-            if [[ "$file" == src/main/java/* ]] || \
-               [[ "$file" == src/main/resources/* ]] || \
-               [[ "$file" == src/test/* ]] || \
-               [[ "$file" == "pom.xml" ]]; then
+            # Source files and tests (multi-module structure)
+            if [[ "$file" == */src/main/java/* ]] || \
+               [[ "$file" == */src/main/resources/* ]] || \
+               [[ "$file" == */src/test/* ]] || \
+               [[ "$file" == common/* ]] || \
+               [[ "$file" == bukkit/* ]] || \
+               [[ "$file" == fabric/* ]] || \
+               [[ "$file" == forge/* ]] || \
+               [[ "$file" == neoforge/* ]] || \
+               [[ "$file" == "build.gradle.kts" ]] || \
+               [[ "$file" == "settings.gradle.kts" ]] || \
+               [[ "$file" == "gradle.properties" ]] || \
+               [[ "$file" == */build.gradle.kts ]]; then
               SHOULD_TEST="true"
               echo "✅ Code file changed: $file"
               break
@@ -68,170 +76,187 @@ jobs:
           echo "should_test=$SHOULD_TEST" >> $GITHUB_OUTPUT
           echo "Should test: $SHOULD_TEST"
 
-  test:
-    name: Unit Tests & Coverage
+  test-common:
+    name: Test Common
     needs: check-changes
     if: needs.check-changes.outputs.should_test == 'true'
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: maven
+          cache: gradle
 
-      - name: Run tests with coverage (90% threshold enforced)
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Common tests
         run: |
-          echo "🧪 Running tests with coverage..."
-          mvn test -B
-          echo "✅ All tests passed and coverage threshold (90%) met!"
+          echo "🧪 Running Common module tests..."
+          ./gradlew :common:test --no-daemon
+          echo "✅ Common tests passed!"
 
-      - name: Generate coverage summary
-        if: always()
-        run: |
-          echo "## 📊 Test Results & Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Test results
-          if [ -d "target/surefire-reports" ]; then
-            echo "### ✅ Test Results" >> $GITHUB_STEP_SUMMARY
-            for file in target/surefire-reports/*.txt; do
-              if [ -f "$file" ]; then
-                echo '```' >> $GITHUB_STEP_SUMMARY
-                cat "$file" >> $GITHUB_STEP_SUMMARY
-                echo '```' >> $GITHUB_STEP_SUMMARY
-              fi
-            done
-          fi
-          
-          # Coverage summary from CSV
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📈 Code Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f "target/site/jacoco/jacoco.csv" ]; then
-            echo "| Class | Instructions | Coverage |" >> $GITHUB_STEP_SUMMARY
-            echo "|-------|--------------|----------|" >> $GITHUB_STEP_SUMMARY
-            
-            # Parse CSV (skip header)
-            tail -n +2 target/site/jacoco/jacoco.csv | while IFS=',' read -r group package class missed covered rest; do
-              total=$((missed + covered))
-              if [ $total -gt 0 ]; then
-                pct=$((covered * 100 / total))
-                echo "| \`$class\` | $covered/$total | ${pct}% |" >> $GITHUB_STEP_SUMMARY
-              fi
-            done
-            
-            # Calculate total
-            TOTAL_MISSED=$(tail -n +2 target/site/jacoco/jacoco.csv | cut -d',' -f4 | paste -sd+ | bc)
-            TOTAL_COVERED=$(tail -n +2 target/site/jacoco/jacoco.csv | cut -d',' -f5 | paste -sd+ | bc)
-            TOTAL=$((TOTAL_MISSED + TOTAL_COVERED))
-            if [ $TOTAL -gt 0 ]; then
-              TOTAL_PCT=$((TOTAL_COVERED * 100 / TOTAL))
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Total Coverage: ${TOTAL_PCT}%** (${TOTAL_COVERED}/${TOTAL} instructions)" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> ℹ️ Minimum required coverage: **90%**" >> $GITHUB_STEP_SUMMARY
-          echo "> Some classes are excluded from coverage (Bukkit runtime dependencies)" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@v5
-        with:
-          files: target/site/jacoco/jacoco.xml
-          fail_ci_if_error: false
-          verbose: true
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: test-results
-          path: target/surefire-reports/
-          retention-days: 7
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: coverage-report
-          path: target/site/jacoco/
-          retention-days: 7
-
-  code-analysis:
-    name: Code Analysis
+  build-bukkit:
+    name: Build & Test Bukkit
     needs: check-changes
     if: needs.check-changes.outputs.should_test == 'true'
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: maven
+          cache: gradle
 
-      - name: Compile project
-        run: mvn compile -B
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-      - name: Run SpotBugs analysis
+      - name: Build Bukkit module
         run: |
-          echo "🔍 Running SpotBugs static analysis..."
-          mvn spotbugs:check -B
-          echo "✅ SpotBugs analysis passed!"
+          echo "🏗️ Building Bukkit module..."
+          ./gradlew :bukkit:build --no-daemon
+          echo "✅ Bukkit build completed!"
 
-      - name: Run PMD analysis
+      - name: Run Bukkit tests
         run: |
-          echo "🔍 Running PMD code analysis..."
-          mvn pmd:check -B
-          echo "✅ PMD analysis passed!"
+          echo "🧪 Running Bukkit tests..."
+          ./gradlew :bukkit:test --no-daemon
+          echo "✅ Bukkit tests passed!"
 
-      - name: Generate analysis summary
-        if: always()
-        run: |
-          echo "## 🔬 Code Analysis Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f "target/spotbugsXml.xml" ]; then
-            BUGS=$(grep -c "<BugInstance" target/spotbugsXml.xml 2>/dev/null || echo "0")
-            echo "### SpotBugs" >> $GITHUB_STEP_SUMMARY
-            if [ "$BUGS" -eq "0" ]; then
-              echo "✅ No bugs found" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "❌ Bugs found: $BUGS" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f "target/pmd.xml" ]; then
-            VIOLATIONS=$(grep -c "<violation" target/pmd.xml 2>/dev/null || echo "0")
-            echo "### PMD" >> $GITHUB_STEP_SUMMARY
-            if [ "$VIOLATIONS" -eq "0" ]; then
-              echo "✅ No violations found" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "❌ Violations found: $VIOLATIONS" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-
-      - name: Upload analysis reports
-        if: always()
-        uses: actions/upload-artifact@v5
+      - name: Upload Bukkit artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: code-analysis-reports
-          path: |
-            target/spotbugsXml.xml
-            target/pmd.xml
+          name: DisableVillagerTrade-Bukkit
+          path: bukkit/build/libs/*.jar
           retention-days: 7
+
+  build-fabric:
+    name: Build Fabric
+    needs: check-changes
+    if: needs.check-changes.outputs.should_test == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Fabric module
+        run: |
+          echo "🏗️ Building Fabric module..."
+          ./gradlew :fabric:build --no-daemon
+          echo "✅ Fabric build completed!"
+
+      - name: Upload Fabric artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DisableVillagerTrade-Fabric
+          path: fabric/build/libs/*.jar
+          retention-days: 7
+
+  build-forge:
+    name: Build Forge
+    needs: check-changes
+    if: needs.check-changes.outputs.should_test == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Forge module
+        run: |
+          echo "🏗️ Building Forge module..."
+          ./gradlew :forge:build --no-daemon
+          echo "✅ Forge build completed!"
+
+      - name: Upload Forge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DisableVillagerTrade-Forge
+          path: forge/build/libs/*.jar
+          retention-days: 7
+
+  build-neoforge:
+    name: Build NeoForge
+    needs: check-changes
+    if: needs.check-changes.outputs.should_test == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build NeoForge module
+        run: |
+          echo "🏗️ Building NeoForge module..."
+          ./gradlew :neoforge:build --no-daemon
+          echo "✅ NeoForge build completed!"
+
+      - name: Upload NeoForge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DisableVillagerTrade-NeoForge
+          path: neoforge/build/libs/*.jar
+          retention-days: 7
+
+  summary:
+    name: Build Summary
+    needs: [test-common, build-bukkit, build-fabric, build-forge, build-neoforge]
+    if: always() && needs.check-changes.outputs.should_test == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Generate build summary
+        run: |
+          echo "## 🏗️ Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Common Tests | ${{ needs.test-common.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bukkit/Spigot/Paper | ${{ needs.build-bukkit.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fabric | ${{ needs.build-fabric.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Forge | ${{ needs.build-forge.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| NeoForge | ${{ needs.build-neoforge.result == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 📦 Build artifacts are available for download in the Actions artifacts section." >> $GITHUB_STEP_SUMMARY

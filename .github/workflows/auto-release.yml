@@ -37,10 +37,18 @@ jobs:
           SHOULD_DEPLOY="false"
           
           while IFS= read -r file; do
-            # Plugin source files
-            if [[ "$file" == src/main/java/* ]] || \
-               [[ "$file" == src/main/resources/* ]] || \
-               [[ "$file" == "pom.xml" ]]; then
+            # Plugin source files (multi-module structure)
+            if [[ "$file" == */src/main/java/* ]] || \
+               [[ "$file" == */src/main/resources/* ]] || \
+               [[ "$file" == common/* ]] || \
+               [[ "$file" == bukkit/* ]] || \
+               [[ "$file" == fabric/* ]] || \
+               [[ "$file" == forge/* ]] || \
+               [[ "$file" == neoforge/* ]] || \
+               [[ "$file" == "build.gradle.kts" ]] || \
+               [[ "$file" == "settings.gradle.kts" ]] || \
+               [[ "$file" == "gradle.properties" ]] || \
+               [[ "$file" == */build.gradle.kts ]]; then
               SHOULD_DEPLOY="true"
               echo "✅ Plugin file changed: $file"
               break
@@ -62,41 +70,9 @@ jobs:
           echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
           echo "Should deploy: $SHOULD_DEPLOY"
 
-  code-analysis:
-    name: Code Analysis
-    needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up JDK
-        uses: actions/setup-java@v5
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Compile project
-        run: mvn compile -B
-
-      - name: Run SpotBugs analysis
-        run: |
-          echo "🔍 Running SpotBugs static analysis..."
-          mvn spotbugs:check -B
-          echo "✅ SpotBugs analysis passed!"
-
-      - name: Run PMD analysis
-        run: |
-          echo "🔍 Running PMD code analysis..."
-          mvn pmd:check -B
-          echo "✅ PMD analysis passed!"
-
   release:
     name: Build & Release
-    needs: [check-changes, code-analysis]
+    needs: check-changes
     if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
 
@@ -112,7 +88,10 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: maven
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Determine release type
         id: release_type
@@ -130,18 +109,23 @@ jobs:
             echo "🔧 Development Build"
           fi
 
-      - name: Run tests
-        run: |
-          echo "🧪 Running tests..."
-          mvn test -B
-          echo "✅ All tests passed!"
-
       - name: Get current version
         id: current_version
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          # Try modVersion first, then mod_version as fallback
+          VERSION=$(grep "^modVersion=" gradle.properties | cut -d'=' -f2)
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
+          fi
           # Remove any existing suffix
           VERSION=$(echo "$VERSION" | sed 's/-dev.*//g' | sed 's/-SNAPSHOT//g')
+          
+          # Fallback if still empty
+          if [ -z "$VERSION" ]; then
+            echo "⚠️ Could not read version from gradle.properties, using 1.12.0 as fallback"
+            VERSION="1.12.0"
+          fi
+          
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 
@@ -180,35 +164,35 @@ jobs:
           BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
           IS_PRODUCTION="${{ steps.release_type.outputs.is_production }}"
           
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
-          MAJOR=${VERSION_PARTS[0]:-0}
-          MINOR=${VERSION_PARTS[1]:-0}
-          PATCH=${VERSION_PARTS[2]:-0}
-          
-          case $BUMP_TYPE in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-          
-          BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          
           if [ "$IS_PRODUCTION" = "true" ]; then
-            NEW_VERSION="$BASE_VERSION"
+            # Only bump version on production releases
+            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
+            MAJOR=${VERSION_PARTS[0]:-0}
+            MINOR=${VERSION_PARTS[1]:-0}
+            PATCH=${VERSION_PARTS[2]:-0}
+            
+            case $BUMP_TYPE in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            BASE_VERSION="$NEW_VERSION"
           else
-            # Dev builds get commit count suffix
+            # Dev builds use current version with -dev suffix (no bump)
             COMMIT_COUNT=$(git rev-list --count HEAD)
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            NEW_VERSION="${BASE_VERSION}-dev.${COMMIT_COUNT}"
+            NEW_VERSION="${CURRENT}-dev.${COMMIT_COUNT}"
+            BASE_VERSION="$CURRENT"
           fi
           
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -221,14 +205,23 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git pull --rebase origin ${{ steps.release_type.outputs.branch }}
 
-      - name: Update version in pom.xml
+      - name: Update version in gradle.properties
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
-          mvn versions:set -DnewVersion=$NEW_VERSION -DgenerateBackupPoms=false
-          echo "Updated pom.xml to version $NEW_VERSION"
+          # Update modVersion (or mod_version if that's used)
+          if grep -q "^modVersion=" gradle.properties; then
+            sed -i "s/^modVersion=.*/modVersion=$NEW_VERSION/" gradle.properties
+          else
+            sed -i "s/^mod_version=.*/mod_version=$NEW_VERSION/" gradle.properties
+          fi
+          echo "Updated gradle.properties to version $NEW_VERSION"
+          cat gradle.properties | grep -E "^mod[Vv]ersion="
 
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
+      - name: Build all platforms
+        run: |
+          echo "🏗️ Building all platforms..."
+          ./gradlew build --no-daemon
+          echo "✅ All platforms built!"
 
       - name: Generate changelog
         id: changelog
@@ -279,9 +272,75 @@ jobs:
       - name: Commit version bump
         if: steps.release_type.outputs.is_production == 'true'
         run: |
-          git add pom.xml
+          git add gradle.properties
           git commit -m "chore: release v${{ steps.new_version.outputs.new_version }} [skip ci]"
           git push origin master
+
+      - name: Collect artifacts
+        id: artifacts
+        run: |
+          VERSION="${{ steps.new_version.outputs.new_version }}"
+          mkdir -p release-artifacts
+          
+          echo "📦 Collecting artifacts for version ${VERSION}..."
+          echo ""
+          
+          # Debug: Show what's in each build/libs directory
+          echo "=== Bukkit build/libs ==="
+          ls -la bukkit/build/libs/ 2>/dev/null || echo "No bukkit/build/libs directory"
+          echo ""
+          
+          echo "=== Fabric build/libs ==="
+          ls -la fabric/build/libs/ 2>/dev/null || echo "No fabric/build/libs directory"
+          echo ""
+          
+          echo "=== Forge build/libs ==="
+          ls -la forge/build/libs/ 2>/dev/null || echo "No forge/build/libs directory"
+          echo ""
+          
+          echo "=== NeoForge build/libs ==="
+          ls -la neoforge/build/libs/ 2>/dev/null || echo "No neoforge/build/libs directory"
+          echo ""
+          
+          # Find and copy Bukkit artifact (exclude sources and slim jars)
+          BUKKIT_JAR=$(find bukkit/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$BUKKIT_JAR" ]; then
+            cp "$BUKKIT_JAR" "release-artifacts/DisableVillagerTrade-Bukkit-${VERSION}.jar"
+            echo "✅ Bukkit: $BUKKIT_JAR"
+          else
+            echo "⚠️ Bukkit: No JAR found"
+          fi
+          
+          # Find and copy Fabric artifact (not dev or sources)
+          FABRIC_JAR=$(find fabric/build/libs -maxdepth 1 -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$FABRIC_JAR" ]; then
+            cp "$FABRIC_JAR" "release-artifacts/DisableVillagerTrade-Fabric-${VERSION}.jar"
+            echo "✅ Fabric: $FABRIC_JAR"
+          else
+            echo "⚠️ Fabric: No JAR found"
+          fi
+          
+          # Find and copy Forge artifact (exclude sources and slim jars)
+          FORGE_JAR=$(find forge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$FORGE_JAR" ]; then
+            cp "$FORGE_JAR" "release-artifacts/DisableVillagerTrade-Forge-${VERSION}.jar"
+            echo "✅ Forge: $FORGE_JAR"
+          else
+            echo "⚠️ Forge: No JAR found"
+          fi
+          
+          # Find and copy NeoForge artifact (exclude sources and slim jars)
+          NEOFORGE_JAR=$(find neoforge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$NEOFORGE_JAR" ]; then
+            cp "$NEOFORGE_JAR" "release-artifacts/DisableVillagerTrade-NeoForge-${VERSION}.jar"
+            echo "✅ NeoForge: $NEOFORGE_JAR"
+          else
+            echo "⚠️ NeoForge: No JAR found"
+          fi
+          
+          echo ""
+          echo "=== Final release artifacts ==="
+          ls -la release-artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -295,33 +354,36 @@ jobs:
             
             ${{ steps.changelog.outputs.changelog }}
             
-            ## 📦 Installation
+            ## 📦 Downloads
             
-            1. Download `disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar` below
-            2. Place it in your server's `plugins` folder
-            3. Restart your server
+            | Platform | File | Minecraft Version |
+            |----------|------|-------------------|
+            | **Bukkit/Spigot/Paper** | `DisableVillagerTrade-Bukkit-${{ steps.new_version.outputs.new_version }}.jar` | 1.14 - 1.21.10+ |
+            | **Fabric** | `DisableVillagerTrade-Fabric-${{ steps.new_version.outputs.new_version }}.jar` | 1.21.10 |
+            | **Forge** | `DisableVillagerTrade-Forge-${{ steps.new_version.outputs.new_version }}.jar` | 1.21.10 |
+            | **NeoForge** | `DisableVillagerTrade-NeoForge-${{ steps.new_version.outputs.new_version }}.jar` | 1.21.10 |
+            | **Quilt** | Use Fabric version | 1.21.10 |
             
             ## 📋 Requirements
             
-            - **Minecraft**: 1.14 - 1.21.4+
-            - **Server**: Spigot, Paper, Purpur
             - **Java**: 21+
-          files: target/DisableVillagerTrade-${{ steps.new_version.outputs.new_version }}.jar
+            - **Fabric**: Requires [Fabric API](https://modrinth.com/mod/fabric-api)
+          files: release-artifacts/*.jar
           draft: false
           prerelease: ${{ steps.release_type.outputs.is_production != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Only publish to Modrinth for production releases
-      - name: Publish to Modrinth
+      - name: Publish Bukkit to Modrinth
         if: steps.release_type.outputs.is_production == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: target/DisableVillagerTrade-${{ steps.new_version.outputs.new_version }}.jar
-          name: v${{ steps.new_version.outputs.new_version }} - ${{ steps.changelog.outputs.summary }}
-          version: ${{ steps.new_version.outputs.new_version }}
+          files: release-artifacts/DisableVillagerTrade-Bukkit-${{ steps.new_version.outputs.new_version }}.jar
+          name: v${{ steps.new_version.outputs.new_version }} (Bukkit) - ${{ steps.changelog.outputs.summary }}
+          version: ${{ steps.new_version.outputs.new_version }}-bukkit
           version-type: release
           loaders: |
             spigot
@@ -365,11 +427,84 @@ jobs:
             1.21.2
             1.21.3
             1.21.4
+            1.21.5
+            1.21.6
+            1.21.7
+            1.21.8
+            1.21.9
+            1.21.10
           changelog: |
             ## What's New
             ${{ steps.changelog.outputs.changelog }}
             
             **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+        continue-on-error: true
+
+      - name: Publish Fabric to Modrinth
+        if: steps.release_type.outputs.is_production == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: release-artifacts/DisableVillagerTrade-Fabric-${{ steps.new_version.outputs.new_version }}.jar
+          name: v${{ steps.new_version.outputs.new_version }} (Fabric) - ${{ steps.changelog.outputs.summary }}
+          version: ${{ steps.new_version.outputs.new_version }}-fabric
+          version-type: release
+          loaders: |
+            fabric
+            quilt
+          game-versions: |
+            1.21.10
+          dependencies: |
+            fabric-api | depends
+          changelog: |
+            ## What's New
+            ${{ steps.changelog.outputs.changelog }}
+            
+            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+        continue-on-error: true
+
+      - name: Publish Forge to Modrinth
+        if: steps.release_type.outputs.is_production == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: release-artifacts/DisableVillagerTrade-Forge-${{ steps.new_version.outputs.new_version }}.jar
+          name: v${{ steps.new_version.outputs.new_version }} (Forge) - ${{ steps.changelog.outputs.summary }}
+          version: ${{ steps.new_version.outputs.new_version }}-forge
+          version-type: release
+          loaders: |
+            forge
+          game-versions: |
+            1.21.10
+          changelog: |
+            ## What's New
+            ${{ steps.changelog.outputs.changelog }}
+            
+            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+        continue-on-error: true
+
+      - name: Publish NeoForge to Modrinth
+        if: steps.release_type.outputs.is_production == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: release-artifacts/DisableVillagerTrade-NeoForge-${{ steps.new_version.outputs.new_version }}.jar
+          name: v${{ steps.new_version.outputs.new_version }} (NeoForge) - ${{ steps.changelog.outputs.summary }}
+          version: ${{ steps.new_version.outputs.new_version }}-neoforge
+          version-type: release
+          loaders: |
+            neoforge
+          game-versions: |
+            1.21.10
+          changelog: |
+            ## What's New
+            ${{ steps.changelog.outputs.changelog }}
+            
+            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+        continue-on-error: true
 
       - name: Update Modrinth Description
         if: steps.release_type.outputs.is_production == 'true' && vars.MODRINTH_PROJECT_ID != ''

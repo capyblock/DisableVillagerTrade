@@ -1,0 +1,11 @@
+{
+  "disablevillagertrade.trade_blocked": "§cYou can't trade with villagers on this server.",
+  "disablevillagertrade.config.title": "DisableVillagerTrade Configuration",
+  "disablevillagertrade.config.message_enabled": "Show Block Message",
+  "disablevillagertrade.config.message_enabled.tooltip": "Whether to show a message when trading is blocked",
+  "disablevillagertrade.config.message_text": "Block Message",
+  "disablevillagertrade.config.message_text.tooltip": "The message shown when a player tries to trade",
+  "disablevillagertrade.config.disabled_worlds": "Allowed Dimensions",
+  "disablevillagertrade.config.disabled_worlds.tooltip": "Dimensions where trading is allowed (not blocked)"
+}
+

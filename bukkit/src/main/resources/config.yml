@@ -1,0 +1,30 @@
+# DisableVillagerTrade Configuration
+# https://github.com/dodoflix/DisableVillagerTrade
+
+# DO NOT CHANGE - Used for automatic config migration
+config-version: 3
+
+# Message settings
+message:
+  # Whether to show a message when trading is blocked
+  enabled: true
+  # The message to show (supports color codes with &)
+  text: "&cYou can't trade with villagers on this server."
+
+# Worlds where villager trading is ALLOWED (not blocked)
+# Add world names here to enable trading in specific worlds
+disabled-worlds:
+  - example-world
+
+# Update checker settings
+update-checker:
+  # Whether to check for updates
+  enabled: true
+  # How often to check for updates (in hours)
+  check-interval: 24
+  # Whether to notify players with permission on join
+  notify-on-join: true
+  # Message shown when an update is available (supports color codes with &)
+  # Placeholders: %current% (current version), %latest% (latest version)
+  message: "&e[DisableVillagerTrade] &fA new version is available! &7(%current% → %latest%)"
+

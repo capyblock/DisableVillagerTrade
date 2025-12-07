@@ -1,0 +1,26 @@
+name: DisableVillagerTrade
+version: '${version}'
+main: me.dodo.disablevillagertrade.bukkit.DisableVillagerTrade
+api-version: '1.21'
+authors:
+  - dodo
+description: ${description}
+website: https://github.com/dodoflix/DisableVillagerTrade
+
+commands:
+  disabletrade:
+    description: Main command for DisableVillagerTrade plugin
+    usage: /<command> <reload|status|toggle|help>
+    aliases: [dvt, tradetoggle]
+
+permissions:
+  disabletrade.admin:
+    description: Allows access to all DisableVillagerTrade admin commands.
+    default: op
+  disabletrade.bypass:
+    description: Allows the player to bypass the trade block and trade with villagers.
+    default: op
+  disabletrade.update:
+    description: Receives update notifications when a new version is available.
+    default: op
+
