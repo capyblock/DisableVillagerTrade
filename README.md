@@ -45,7 +45,6 @@ mvn clean package
 |----------|------|
 | GitHub Releases | [Download](https://github.com/capyblock/DisableVillagerTrade/releases) |
 | Modrinth | Coming soon |
-| Hangar | Coming soon |
 
 ## Releases
 
@@ -53,7 +52,7 @@ This project uses automated releases via GitHub Actions. When changes are pushed
 
 1. The version is automatically bumped based on [Conventional Commits](https://www.conventionalcommits.org/)
 2. A new GitHub Release is created with the compiled JAR
-3. The plugin is automatically published to **Modrinth** and **Hangar**
+3. The plugin is automatically published to **Modrinth**
 4. A changelog is automatically generated
 
 ### Version Bumping
@@ -66,7 +65,7 @@ This project uses automated releases via GitHub Actions. When changes are pushed
 
 ### Release Platform Setup (For Maintainers)
 
-To enable auto-publishing to Modrinth and Hangar, configure the following in your GitHub repository:
+To enable auto-publishing to Modrinth, configure the following in your GitHub repository:
 
 <details>
 <summary><b>🔧 Setup Instructions</b></summary>
@@ -76,14 +75,12 @@ To enable auto-publishing to Modrinth and Hangar, configure the following in you
 | Variable | Description |
 |----------|-------------|
 | `MODRINTH_PROJECT_ID` | Your Modrinth project ID (found in project URL or settings) |
-| `HANGAR_PROJECT_ID` | Your Hangar project slug (e.g., `DisableVillagerTrade`) |
 
 #### Repository Secrets (Settings → Secrets and variables → Actions → Secrets)
 
 | Secret | How to Get |
 |--------|------------|
 | `MODRINTH_TOKEN` | [Modrinth Settings](https://modrinth.com/settings/pats) → Create PAT with `Write projects` scope |
-| `HANGAR_TOKEN` | [Hangar API Keys](https://hangar.papermc.io/auth/settings/api-keys) → Create key with `create_version` permission |
 
 </details>
 
