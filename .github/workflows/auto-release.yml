@@ -294,12 +294,13 @@ jobs:
       - name: Setup Forge server
         run: |
           mkdir -p test-server/mods
-          FORGE_VERSION=$(grep "forgeVersion=" gradle.properties | cut -d'=' -f2)
+          FORGE_VERSION=$(grep "forgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Using Forge version: $FORGE_VERSION"
           
           # Download Forge installer
-          curl -o forge-installer.jar \
-            "https://maven.minecraftforge.net/net/minecraftforge/forge/${FORGE_VERSION}/forge-${FORGE_VERSION}-installer.jar"
+          FORGE_URL="https://maven.minecraftforge.net/net/minecraftforge/forge/${FORGE_VERSION}/forge-${FORGE_VERSION}-installer.jar"
+          echo "Downloading from: $FORGE_URL"
+          curl -f -o forge-installer.jar "$FORGE_URL"
           
           # Install server
           java -jar forge-installer.jar --installServer test-server
@@ -386,11 +387,12 @@ jobs:
       - name: Setup NeoForge server
         run: |
           mkdir -p test-server/mods
-          NEOFORGE_VERSION=$(grep "neoforgeVersion=" gradle.properties | cut -d'=' -f2)
+          NEOFORGE_VERSION=$(grep "neoforgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Using NeoForge version: $NEOFORGE_VERSION"
           
-          curl -o neoforge-installer.jar \
-            "https://maven.neoforged.net/releases/net/neoforged/neoforge/${NEOFORGE_VERSION}/neoforge-${NEOFORGE_VERSION}-installer.jar"
+          NEOFORGE_URL="https://maven.neoforged.net/releases/net/neoforged/neoforge/${NEOFORGE_VERSION}/neoforge-${NEOFORGE_VERSION}-installer.jar"
+          echo "Downloading from: $NEOFORGE_URL"
+          curl -f -o neoforge-installer.jar "$NEOFORGE_URL"
           java -jar neoforge-installer.jar --installServer test-server
           
           find neoforge/build/libs -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
