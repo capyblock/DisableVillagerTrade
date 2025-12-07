@@ -59,8 +59,8 @@ public class VillagerTradeHandler {
         );
         
         if (shouldBlock) {
-            // Cancel the interaction
-            event.setCanceled(true);
+            // Cancel the interaction using setCancellationResult only
+            // In Forge 60.x, EntityInteract doesn't have setCanceled()
             event.setCancellationResult(InteractionResult.FAIL);
             
             // Send message to player

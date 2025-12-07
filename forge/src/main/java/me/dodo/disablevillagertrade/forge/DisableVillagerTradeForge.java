@@ -12,8 +12,8 @@ import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.bus.BusGroup;
 import net.minecraftforge.eventbus.api.listener.SubscribeEvent;
-import net.minecraftforge.fml.ModContainer;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import org.apache.logging.log4j.LogManager;
@@ -38,13 +38,13 @@ public class DisableVillagerTradeForge {
     private static UpdateChecker updateChecker;
     private static ScheduledExecutorService scheduler;
     
-    public DisableVillagerTradeForge(ModContainer modContainer) {
+    public DisableVillagerTradeForge() {
         instance = this;
         
         LOGGER.info("Initializing DisableVillagerTrade for Forge...");
         
-        // Register config
-        modContainer.registerConfig(ModConfig.Type.SERVER, ForgeConfig.SPEC, Constants.MOD_ID + "-server.toml");
+        // Register config using ModLoadingContext
+        ModLoadingContext.get().getActiveContainer().registerConfig(ModConfig.Type.SERVER, ForgeConfig.SPEC, Constants.MOD_ID + "-server.toml");
         config = new ForgeConfig();
         
         // Initialize trade blocker
