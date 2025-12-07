@@ -5,18 +5,17 @@ import me.dodo.disablevillagertrade.forge.config.ForgeConfig;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
  * Handles villager interaction events for Forge.
  */
 public class VillagerTradeHandler {
     
-    @SubscribeEvent
+    @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onPlayerInteractEntity(PlayerInteractEvent.EntityInteract event) {
         // Only process villager interactions
         if (!(event.getTarget() instanceof Villager villager)) {
@@ -61,7 +60,7 @@ public class VillagerTradeHandler {
         if (shouldBlock) {
             // Cancel the interaction
             event.setCanceled(true);
-            event.setResult(Event.Result.DENY);
+            event.setCancellationResult(InteractionResult.FAIL);
             
             // Send message to player
             if (ForgeConfig.MESSAGE_ENABLED.get()) {

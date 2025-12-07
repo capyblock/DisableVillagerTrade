@@ -11,8 +11,8 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.ModContainer;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import org.apache.logging.log4j.LogManager;
@@ -36,13 +36,13 @@ public class DisableVillagerTradeForge {
     private static UpdateChecker updateChecker;
     private static ScheduledExecutorService scheduler;
     
-    public DisableVillagerTradeForge() {
+    public DisableVillagerTradeForge(ModContainer modContainer) {
         instance = this;
         
         LOGGER.info("Initializing DisableVillagerTrade for Forge...");
         
         // Register config
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, ForgeConfig.SPEC, Constants.MOD_ID + "-server.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ForgeConfig.SPEC, Constants.MOD_ID + "-server.toml");
         config = new ForgeConfig();
         
         // Initialize trade blocker
@@ -55,11 +55,11 @@ public class DisableVillagerTradeForge {
         LOGGER.info("DisableVillagerTrade initialized!");
     }
     
-    @SubscribeEvent
+    @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
         // Initialize update checker
         if (ForgeConfig.UPDATE_CHECKER_ENABLED.get()) {
-            String version = net.minecraftforge.fml.ModList.get()
+            String version = ModList.get()
                 .getModContainerById(Constants.MOD_ID)
                 .map(c -> c.getModInfo().getVersion().toString())
                 .orElse("unknown");
@@ -81,14 +81,14 @@ public class DisableVillagerTradeForge {
         }
     }
     
-    @SubscribeEvent
+    @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         if (scheduler != null) {
             scheduler.shutdown();
         }
     }
     
-    @SubscribeEvent
+    @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             if (ForgeConfig.NOTIFY_ON_JOIN.get() && updateChecker != null && updateChecker.isUpdateAvailable()) {
@@ -116,4 +116,3 @@ public class DisableVillagerTradeForge {
         return tradeBlocker;
     }
 }
-
