@@ -1,14 +1,16 @@
 # Disable Villager Trade
 
-A lightweight Spigot/Paper plugin that prevents players from trading with villagers on your Minecraft server.
+## Overview
 
-## ✨ Features
+DisableVillagerTrade is a lightweight plugin crafted to block trading interactions exclusively with villagers while preserving interactions with other non-player characters (NPCs). This ensures a balanced and immersive gameplay experience on your server.
 
-- **Block Villager Trading** - Prevents players from opening the villager trade interface
-- **Configurable Messages** - Customize the message shown when trading is blocked
-- **Bypass Permission** - Allow staff to trade with `disabletrade.bypass` permission
-- **Per-World Support** - Disable trading only in specific worlds
-- **Profession Filter** - Villagers with no profession (NONE) can still be interacted with
+## ✨ Key Features
+
+- **Custom Interaction Messages** - Personalize interaction messages to match your server's tone and style, enhancing player engagement.
+- **Toggle Interaction Messages** - Easily enable or disable interaction messages according to server preferences.
+- **World-Specific Disablement** - Fine-tune gameplay dynamics by enabling or disabling the plugin on a per-world basis, granting precise control over trading functionalities.
+- **Bypass Permission** - Allow staff to trade with `disabletrade.bypass` permission.
+- **Smart Profession Detection** - Villagers with no profession (NONE) can still be interacted with.
 
 ## 📦 Installation
 
