@@ -2,6 +2,9 @@ package me.dodo.disablevillagertrade;
 
 import org.junit.jupiter.api.*;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("DisableVillagerTrade Plugin Tests")
@@ -16,15 +19,20 @@ class DisableVillagerTradeTest {
     @Test
     @DisplayName("Plugin should extend JavaPlugin")
     void pluginExtendsJavaPlugin() {
-        assertTrue(org.bukkit.plugin.java.JavaPlugin.class.isAssignableFrom(DisableVillagerTrade.class),
+        Class<?> pluginClass = DisableVillagerTrade.class;
+        Class<?> superClass = pluginClass.getSuperclass();
+        assertEquals("JavaPlugin", superClass.getSimpleName(),
             "DisableVillagerTrade should extend JavaPlugin");
     }
     
     @Test
-    @DisplayName("Plugin should have getConfigManager method")
-    void pluginHasGetConfigManagerMethod() {
-        assertDoesNotThrow(() -> DisableVillagerTrade.class.getMethod("getConfigManager"),
-            "Plugin should have getConfigManager method");
+    @DisplayName("Plugin should have static getConfigManager method")
+    void pluginHasGetConfigManagerMethod() throws NoSuchMethodException {
+        Method method = DisableVillagerTrade.class.getMethod("getConfigManager");
+        assertTrue(Modifier.isStatic(method.getModifiers()), 
+            "getConfigManager should be static");
+        assertTrue(Modifier.isPublic(method.getModifiers()), 
+            "getConfigManager should be public");
     }
     
     @Test
@@ -32,5 +40,12 @@ class DisableVillagerTradeTest {
     void pluginHasOnEnableMethod() {
         assertDoesNotThrow(() -> DisableVillagerTrade.class.getMethod("onEnable"),
             "Plugin should have onEnable method");
+    }
+    
+    @Test
+    @DisplayName("Plugin class should be final")
+    void pluginClassIsFinal() {
+        assertTrue(Modifier.isFinal(DisableVillagerTrade.class.getModifiers()),
+            "Plugin class should be final");
     }
 }
