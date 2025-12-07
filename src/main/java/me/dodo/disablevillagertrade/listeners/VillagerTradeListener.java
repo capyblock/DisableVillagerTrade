@@ -1,5 +1,6 @@
 package me.dodo.disablevillagertrade.listeners;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import me.dodo.disablevillagertrade.DisableVillagerTrade;
 import me.dodo.disablevillagertrade.config.PluginConfig;
 import me.dodo.disablevillagertrade.logic.TradeBlocker;
@@ -29,6 +30,8 @@ public class VillagerTradeListener implements Listener {
      * Creates a new villager trade listener.
      * @param plugin the plugin instance
      */
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", 
+        justification = "Plugin reference is intentionally stored for Bukkit API access")
     public VillagerTradeListener(DisableVillagerTrade plugin) {
         this.plugin = plugin;
         this.tradeBlocker = new TradeBlocker();

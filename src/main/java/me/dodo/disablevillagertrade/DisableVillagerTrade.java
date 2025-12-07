@@ -1,5 +1,6 @@
 package me.dodo.disablevillagertrade;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import me.dodo.disablevillagertrade.config.ConfigMigrator;
 import me.dodo.disablevillagertrade.listeners.VillagerTradeListener;
 import me.dodo.disablevillagertrade.config.PluginConfig;
@@ -15,6 +16,8 @@ public final class DisableVillagerTrade extends JavaPlugin {
     private PluginConfig pluginConfig;
 
     @Override
+    @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", 
+        justification = "Singleton pattern required for Bukkit plugin lifecycle")
     public void onEnable() {
         instance = this;
         
@@ -35,6 +38,8 @@ public final class DisableVillagerTrade extends JavaPlugin {
     }
 
     @Override
+    @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", 
+        justification = "Singleton pattern required for Bukkit plugin lifecycle")
     public void onDisable() {
         getLogger().info("DisableVillagerTrade has been disabled!");
         instance = null;
@@ -44,6 +49,8 @@ public final class DisableVillagerTrade extends JavaPlugin {
      * Gets the plugin instance.
      * @return the plugin instance
      */
+    @SuppressFBWarnings(value = "MS_EXPOSE_REP", 
+        justification = "Intentional singleton access for Bukkit plugin")
     public static DisableVillagerTrade getInstance() {
         return instance;
     }

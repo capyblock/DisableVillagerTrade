@@ -1,5 +1,6 @@
 package me.dodo.disablevillagertrade.config;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -15,6 +16,8 @@ public class ConfigMigrator {
     private final JavaPlugin plugin;
     private final Logger logger;
     
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", 
+        justification = "Plugin reference is intentionally stored for Bukkit API access")
     public ConfigMigrator(JavaPlugin plugin) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
