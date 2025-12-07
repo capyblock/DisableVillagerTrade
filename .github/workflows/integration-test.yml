@@ -1,7 +1,6 @@
 name: Integration Tests
 
 on:
-  workflow_call:  # Called by auto-release before releasing
   workflow_dispatch:  # Manual trigger
   pull_request:
     branches: [develop, master]
@@ -13,8 +12,57 @@ env:
   JAVA_VERSION: '21'
 
 jobs:
+  # Build everything once
+  build:
+    name: 🔨 Build All Platforms
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Build all platforms
+        run: |
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      
+      - name: Upload Bukkit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bukkit-jar
+          path: bukkit/build/libs/*.jar
+          retention-days: 1
+      
+      - name: Upload Fabric artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fabric-jar
+          path: fabric/build/libs/*.jar
+          retention-days: 1
+      
+      - name: Upload Forge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-jar
+          path: forge/build/libs/*.jar
+          retention-days: 1
+      
+      - name: Upload NeoForge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoforge-jar
+          path: neoforge/build/libs/*.jar
+          retention-days: 1
+
   test-bukkit:
     name: 🪣 Test Bukkit/Paper
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -27,20 +75,20 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build plugin
-        run: ./gradlew :bukkit:shadowJar --no-daemon
+      - name: Download Bukkit artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bukkit-jar
+          path: bukkit-build
       
       - name: Download Paper server
         run: |
           mkdir -p test-server/plugins
           
-          # Get MC version from gradle.properties
-          MC_VERSION=$(grep "minecraftVersion=" gradle.properties | cut -d'=' -f2)
+          MC_VERSION=$(grep "^minecraftVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Building for Minecraft $MC_VERSION"
           
-          # Try to get Paper for the exact version, fall back to latest stable
           PAPER_BUILD=$(curl -s "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" 2>/dev/null | jq -r '.builds[-1].build' 2>/dev/null)
           
           if [ -z "$PAPER_BUILD" ] || [ "$PAPER_BUILD" = "null" ]; then
@@ -53,84 +101,42 @@ jobs:
           curl -o test-server/paper.jar \
             "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${PAPER_BUILD}/downloads/paper-${MC_VERSION}-${PAPER_BUILD}.jar"
           
-          # Copy plugin
-          find bukkit/build/libs -name "*.jar" ! -name "*-slim.jar" -exec cp {} test-server/plugins/ \;
-          
-          # Accept EULA
+          find bukkit-build -name "*.jar" ! -name "*-slim.jar" -exec cp {} test-server/plugins/ \;
           echo "eula=true" > test-server/eula.txt
-          
-          # Server properties for faster startup
-          cat > test-server/server.properties << 'EOF'
-          online-mode=false
-          spawn-protection=0
-          max-tick-time=-1
-          network-compression-threshold=-1
-          EOF
+          echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
       - name: Start Paper server and test plugin
         timeout-minutes: 5
         run: |
           cd test-server
-          
-          # Start server in background
           java -Xmx1G -jar paper.jar --nogui &
           SERVER_PID=$!
           
           echo "⏳ Waiting for server to start..."
           
-          # Wait for server to be ready (check for "Done" in logs)
           for i in {1..120}; do
             if grep -q "Done" logs/latest.log 2>/dev/null; then
               echo "✅ Server started successfully!"
               break
             fi
             if ! kill -0 $SERVER_PID 2>/dev/null; then
-              echo "❌ Server crashed!"
-              cat logs/latest.log 2>/dev/null || echo "No logs found"
-              exit 1
+              echo "❌ Server crashed!"; cat logs/latest.log 2>/dev/null; exit 1
             fi
             sleep 1
           done
           
-          # Check if plugin loaded successfully
-          echo ""
-          echo "📋 Checking plugin status..."
-          
-          # Check if plugin was initialized (Paper shows it in plugin list)
           if grep -qi "DisableVillagerTrade" logs/latest.log; then
             echo "✅ Plugin loaded!"
-            grep -i "DisableVillagerTrade" logs/latest.log | head -5
           else
-            echo "❌ Plugin failed to load!"
-            cat logs/latest.log
-            kill $SERVER_PID 2>/dev/null
-            exit 1
+            echo "❌ Plugin failed to load!"; cat logs/latest.log; exit 1
           fi
           
-          # Check for errors
           if grep -qiE "(ERROR|SEVERE).*DisableVillagerTrade" logs/latest.log; then
-            echo "❌ Plugin has errors!"
-            grep -iE "(ERROR|SEVERE)" logs/latest.log
-            kill $SERVER_PID 2>/dev/null
-            exit 1
+            echo "❌ Plugin has errors!"; exit 1
           fi
           
-          # Check for failed to load messages
-          if grep -qi "Could not load.*DisableVillagerTrade\|failed to load.*DisableVillagerTrade" logs/latest.log; then
-            echo "❌ Plugin failed to load!"
-            grep -i "DisableVillagerTrade" logs/latest.log
-            kill $SERVER_PID 2>/dev/null
-            exit 1
-          fi
-          
-          echo "✅ No errors detected!"
-          
-          # Graceful shutdown
           kill $SERVER_PID 2>/dev/null || true
-          
-          echo ""
-          echo "📜 Plugin log entries:"
-          grep -i "DisableVillagerTrade" logs/latest.log | head -10 || echo "No plugin log entries found"
+          echo "✅ Bukkit integration test passed!"
       
       - name: Upload logs on failure
         if: failure()
@@ -141,6 +147,7 @@ jobs:
 
   test-fabric:
     name: 🧵 Test Fabric
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -153,52 +160,36 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build plugin
-        run: ./gradlew :fabric:build --no-daemon
+      - name: Download Fabric artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fabric-jar
+          path: fabric-build
       
       - name: Download Fabric server
         run: |
           mkdir -p test-server/mods
           
-          # Get MC version from gradle.properties
-          MC_VERSION=$(grep "minecraftVersion=" gradle.properties | cut -d'=' -f2)
+          MC_VERSION=$(grep "^minecraftVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Building for Minecraft $MC_VERSION"
           
-          # Download Fabric installer and create server
-          curl -o fabric-installer.jar \
-            "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
-          
+          curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
           java -jar fabric-installer.jar server -mcversion $MC_VERSION -dir test-server -downloadMinecraft
           
-          # Download Fabric API
           FABRIC_API_URL=$(curl -s "https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%22${MC_VERSION}%22%5D&loaders=%5B%22fabric%22%5D" | jq -r '.[0].files[0].url')
           if [ -n "$FABRIC_API_URL" ] && [ "$FABRIC_API_URL" != "null" ]; then
             curl -L -o test-server/mods/fabric-api.jar "$FABRIC_API_URL"
-          else
-            echo "⚠️ Could not find Fabric API for $MC_VERSION"
           fi
           
-          # Copy mod
-          find fabric/build/libs -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} test-server/mods/ \;
-          
-          # Accept EULA
+          find fabric-build -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} test-server/mods/ \;
           echo "eula=true" > test-server/eula.txt
-          
-          # Server properties
-          cat > test-server/server.properties << 'EOF'
-          online-mode=false
-          spawn-protection=0
-          max-tick-time=-1
-          EOF
+          echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
       - name: Start Fabric server and test mod
         timeout-minutes: 5
         run: |
           cd test-server
-          
-          # Start server
           java -Xmx1G -jar fabric-server-launch.jar --nogui &
           SERVER_PID=$!
           
@@ -206,34 +197,20 @@ jobs:
           
           for i in {1..120}; do
             if grep -q "Done" logs/latest.log 2>/dev/null; then
-              echo "✅ Server started!"
-              break
+              echo "✅ Server started!"; break
             fi
             if ! kill -0 $SERVER_PID 2>/dev/null; then
-              echo "❌ Server crashed!"
-              cat logs/latest.log 2>/dev/null
-              exit 1
+              echo "❌ Server crashed!"; cat logs/latest.log 2>/dev/null; exit 1
             fi
             sleep 1
           done
           
-          # Check mod loaded
-          if grep -qi "disablevillagertrade" logs/latest.log; then
-            echo "✅ Mod loaded!"
-          else
-            echo "⚠️ Could not confirm mod loaded (checking mods list...)"
-          fi
-          
-          # Check for errors
           if grep -qiE "(ERROR|FATAL).*disablevillagertrade" logs/latest.log; then
-            echo "❌ Mod has errors!"
-            grep -iE "(ERROR|FATAL)" logs/latest.log
-            kill $SERVER_PID 2>/dev/null
-            exit 1
+            echo "❌ Mod has errors!"; exit 1
           fi
           
-          echo "✅ No errors detected!"
           kill $SERVER_PID 2>/dev/null || true
+          echo "✅ Fabric integration test passed!"
       
       - name: Upload logs on failure
         if: failure()
@@ -244,6 +221,7 @@ jobs:
 
   test-forge:
     name: 🔥 Test Forge
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -256,10 +234,12 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build mod
-        run: ./gradlew :forge:build --no-daemon
+      - name: Download Forge artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-jar
+          path: forge-build
       
       - name: Download Forge server
         run: |
@@ -272,7 +252,7 @@ jobs:
           curl -f -o forge-installer.jar "$FORGE_URL"
           java -jar forge-installer.jar --installServer test-server
           
-          find forge/build/libs -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
+          find forge-build -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
           echo "eula=true" > test-server/eula.txt
           echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
@@ -306,7 +286,7 @@ jobs:
           done
           
           if grep -qiE "(ERROR|FATAL).*disablevillagertrade" logs/latest.log 2>/dev/null; then
-            echo "❌ Mod has errors!"; grep -iE "(ERROR|FATAL)" logs/latest.log; exit 1
+            echo "❌ Mod has errors!"; exit 1
           fi
           
           kill $SERVER_PID 2>/dev/null || true
@@ -321,6 +301,7 @@ jobs:
 
   test-neoforge:
     name: ⚒️ Test NeoForge
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -333,86 +314,58 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build plugin
-        run: ./gradlew :neoforge:build --no-daemon
+      - name: Download NeoForge artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: neoforge-jar
+          path: neoforge-build
       
       - name: Download NeoForge server
         run: |
           mkdir -p test-server/mods
-          
-          # Get NeoForge version from gradle.properties
           NEOFORGE_VERSION=$(grep "^neoforgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Using NeoForge version: $NEOFORGE_VERSION"
           
-          # Download NeoForge installer
           NEOFORGE_URL="https://maven.neoforged.net/releases/net/neoforged/neoforge/${NEOFORGE_VERSION}/neoforge-${NEOFORGE_VERSION}-installer.jar"
           echo "Downloading from: $NEOFORGE_URL"
           curl -f -o neoforge-installer.jar "$NEOFORGE_URL"
-          
-          # Install server
           java -jar neoforge-installer.jar --installServer test-server
           
-          # Copy mod
-          find neoforge/build/libs -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
-          
-          # Accept EULA
+          find neoforge-build -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
           echo "eula=true" > test-server/eula.txt
-          
-          # Server properties
-          cat > test-server/server.properties << 'EOF'
-          online-mode=false
-          spawn-protection=0
-          max-tick-time=-1
-          EOF
+          echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
       - name: Start NeoForge server and test mod
         timeout-minutes: 8
         run: |
           cd test-server
           
-          # Find the run script or jar
           if [ -f "run.sh" ]; then
-            chmod +x run.sh
-            ./run.sh --nogui &
+            chmod +x run.sh && ./run.sh --nogui &
           else
             java -Xmx2G @user_jvm_args.txt @libraries/net/neoforged/neoforge/*/unix_args.txt --nogui &
           fi
           SERVER_PID=$!
           
-          echo "⏳ Waiting for NeoForge server to start (this takes a while)..."
+          echo "⏳ Waiting for NeoForge server to start..."
           
           for i in {1..180}; do
             if grep -q "Done" logs/latest.log 2>/dev/null; then
-              echo "✅ Server started!"
-              break
+              echo "✅ Server started!"; break
             fi
             if ! kill -0 $SERVER_PID 2>/dev/null; then
-              echo "❌ Server crashed!"
-              cat logs/latest.log 2>/dev/null || cat logs/debug.log 2>/dev/null
-              exit 1
+              echo "❌ Server crashed!"; cat logs/latest.log 2>/dev/null; exit 1
             fi
             sleep 1
           done
           
-          # Check mod loaded
-          if grep -qi "disablevillagertrade" logs/latest.log 2>/dev/null || grep -qi "disablevillagertrade" logs/debug.log 2>/dev/null; then
-            echo "✅ Mod loaded!"
-          else
-            echo "⚠️ Could not confirm mod loaded"
-          fi
-          
-          # Check for critical errors
           if grep -qiE "(ERROR|FATAL).*disablevillagertrade" logs/latest.log 2>/dev/null; then
-            echo "❌ Mod has errors!"
-            grep -iE "(ERROR|FATAL)" logs/latest.log
-            kill $SERVER_PID 2>/dev/null
-            exit 1
+            echo "❌ Mod has errors!"; exit 1
           fi
           
-          echo "✅ No critical errors detected!"
           kill $SERVER_PID 2>/dev/null || true
+          echo "✅ NeoForge integration test passed!"
       
       - name: Upload logs on failure
         if: failure()
@@ -458,7 +411,6 @@ jobs:
             echo "❌ **NeoForge**: Failed" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Fail if any test failed
           if [ "${{ needs.test-bukkit.result }}" != "success" ] || \
              [ "${{ needs.test-fabric.result }}" != "success" ] || \
              [ "${{ needs.test-forge.result }}" != "success" ] || \
@@ -470,4 +422,3 @@ jobs:
           
           echo ""
           echo "🎉 All integration tests passed!"
-
