@@ -284,18 +284,32 @@ jobs:
         run: |
           # Read description and summary from files
           DESCRIPTION=$(cat .modrinth/description.md)
-          SUMMARY=$(cat .modrinth/summary.txt)
+          SUMMARY=$(tr -d '\n' < .modrinth/summary.txt | head -c 255)
+          
+          echo "Summary to update: $SUMMARY"
+          echo "Summary length: ${#SUMMARY}"
           
           # Update project via Modrinth API
-          curl -X PATCH "https://api.modrinth.com/v2/project/${{ vars.MODRINTH_PROJECT_ID }}" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "https://api.modrinth.com/v2/project/${{ vars.MODRINTH_PROJECT_ID }}" \
             -H "Authorization: ${{ secrets.MODRINTH_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg body "$DESCRIPTION" \
               --arg summary "$SUMMARY" \
-              '{body: $body, summary: $summary}')"
+              '{body: $body, summary: $summary}')")
           
-          echo "✅ Updated Modrinth project description and summary"
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "Response code: $HTTP_CODE"
+          echo "Response body: $BODY"
+          
+          if [ "$HTTP_CODE" -eq 204 ] || [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Updated Modrinth project description and summary"
+          else
+            echo "❌ Failed to update Modrinth project"
+            exit 1
+          fi
         continue-on-error: true
 
       # Hangar auto-release is disabled for now
