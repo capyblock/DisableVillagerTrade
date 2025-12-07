@@ -6,7 +6,7 @@
 
     <groupId>me.dodo</groupId>
     <artifactId>disablevillagertrade</artifactId>
-    <version>1.9.2</version>
+    <version>1.10.0</version>
     <packaging>jar</packaging>
 
     <name>DisableVillagerTrade</name>
