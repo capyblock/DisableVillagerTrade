@@ -6,9 +6,24 @@ Thank you for your interest in contributing to DisableVillagerTrade! This docume
 
 1. Fork the repository
 2. Clone your fork locally
-3. Create a new branch for your feature or fix
+3. Create a new branch from `develop` for your feature or fix
 4. Make your changes
-5. Submit a pull request
+5. Submit a pull request to `develop`
+
+## Branch Strategy
+
+```
+develop → master
+   ↑
+ Your PR
+```
+
+| Branch | Purpose |
+|--------|---------|
+| `develop` | Active development, submit PRs here |
+| `master` | Stable production releases |
+
+**Always create PRs targeting `develop`**, not `master`.
 
 ## Development Setup
 
@@ -97,21 +112,38 @@ Closes #42
 - `fix: correct world name comparison`
 - `docs: update installation instructions`
 
+## Project Structure
+
+```
+src/main/java/me/dodo/disablevillagertrade/
+├── DisableVillagerTrade.java    # Main plugin class
+├── config/
+│   └── PluginConfig.java        # Configuration handling
+├── listeners/
+│   └── VillagerTradeListener.java  # Event listener
+└── logic/
+    └── TradeBlocker.java        # Core business logic (testable)
+```
+
 ## Code Style
 
 - Follow existing code conventions in the project
 - Use meaningful variable and method names
-- Add comments for complex logic
+- Add JavaDocs for public methods
 - Keep methods focused and concise
+- Separate business logic from Bukkit code for testability
 
 ## Testing
 
 Before submitting a PR:
 
-1. Build the project successfully: `mvn clean package`
-2. Test the plugin on a local Spigot/Paper server
-3. Verify your changes work as expected
-4. Check for any console errors or warnings
+1. Run tests: `mvn test`
+2. Build the project: `mvn clean package`
+3. Test the plugin on a local Spigot/Paper server
+4. Verify your changes work as expected
+5. Check for any console errors or warnings
+
+**Note:** All PRs must pass the automated test suite.
 
 ## Reporting Issues
 

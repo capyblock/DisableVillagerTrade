@@ -1,4 +1,10 @@
 # Disable Villager Trade
+
+[![Build](https://github.com/dodoflix/DisableVillagerTrade/actions/workflows/test.yml/badge.svg)](https://github.com/dodoflix/DisableVillagerTrade/actions/workflows/test.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/dodoflix/DisableVillagerTrade?label=release)](https://github.com/dodoflix/DisableVillagerTrade/releases)
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/disable-villager-trade?logo=modrinth&label=modrinth)](https://modrinth.com/plugin/disable-villager-trade)
+[![License](https://img.shields.io/github/license/dodoflix/DisableVillagerTrade)](LICENSE)
+
 Disable villager trade on your minecraft spigot based server!
 
 ## Supported Versions
@@ -20,10 +26,16 @@ Disable villager trade on your minecraft spigot based server!
 4. Configure in `plugins/DisableVillagerTrade/config.yml`
 
 ## Configuration
+
 ```yaml
+# Message settings
 message:
+  # Whether to show a message when trading is blocked
   enabled: true
-  context: "&cYou can't trade with villagers on this server."
+  # The message to show (supports color codes with &)
+  text: "&cYou can't trade with villagers on this server."
+
+# Worlds where villager trading is ALLOWED (not blocked)
 disabled-worlds:
   - example-world
 ```
@@ -49,7 +61,6 @@ mvn test
 
 The project uses:
 - **JUnit 5** - Testing framework
-- **MockBukkit** - Bukkit/Spigot mocking library
 - **Mockito** - Mocking framework
 
 Tests are automatically run on every push and pull request via GitHub Actions.
@@ -58,17 +69,28 @@ Tests are automatically run on every push and pull request via GitHub Actions.
 
 | Platform | Link |
 |----------|------|
-| GitHub Releases | [Download](https://github.com/capyblock/DisableVillagerTrade/releases) |
-| Modrinth | Coming soon |
+| GitHub Releases | [Download](https://github.com/dodoflix/DisableVillagerTrade/releases) |
+| Modrinth | [Download](https://modrinth.com/plugin/disable-villager-trade) |
 
-## Releases
+## Release Pipeline
 
-This project uses automated releases via GitHub Actions. When changes are pushed or merged to the `master` branch:
+This project uses a simple **two-branch model**:
 
-1. The version is automatically bumped based on [Conventional Commits](https://www.conventionalcommits.org/)
-2. A new GitHub Release is created with the compiled JAR
-3. The plugin is automatically published to **Modrinth**
-4. A changelog is automatically generated
+```
+develop → master
+```
+
+### Branches
+
+| Branch | Purpose | Version | Published To |
+|--------|---------|---------|--------------|
+| `develop` | 🔧 Development builds | `1.2.3-dev.456` | GitHub (pre-release) |
+| `master` | 🚀 Stable releases | `1.2.3` | GitHub + Modrinth |
+
+### Workflow
+
+1. **Develop** on `develop` branch → automatic dev builds on GitHub
+2. **Release** by merging `develop` → `master` → stable release to GitHub + Modrinth
 
 ### Version Bumping
 
@@ -79,8 +101,6 @@ This project uses automated releases via GitHub Actions. When changes are pushed
 | `feat!:` or `BREAKING CHANGE:` | `feat!: new config format` | 1.6.0 → 2.0.0 (Major) |
 
 ### Release Platform Setup (For Maintainers)
-
-To enable auto-publishing to Modrinth, configure the following in your GitHub repository:
 
 <details>
 <summary><b>🔧 Setup Instructions</b></summary>
