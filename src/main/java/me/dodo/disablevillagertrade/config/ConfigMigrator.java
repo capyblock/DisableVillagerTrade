@@ -11,7 +11,7 @@ import java.util.logging.Logger;
  */
 public class ConfigMigrator {
     
-    private static final int CURRENT_CONFIG_VERSION = 2;
+    private static final int CURRENT_CONFIG_VERSION = 3;
     
     private final JavaPlugin plugin;
     private final Logger logger;
@@ -44,6 +44,11 @@ public class ConfigMigrator {
             migrated = migrateV1ToV2(config) || migrated;
         }
         
+        // Migration from v2 to v3: add update-checker settings
+        if (configVersion < 3) {
+            migrated = migrateV2ToV3(config) || migrated;
+        }
+        
         // Update config version
         config.set("config-version", CURRENT_CONFIG_VERSION);
         plugin.saveConfig();
@@ -70,6 +75,24 @@ public class ConfigMigrator {
             config.set("message.context", null);
             
             logger.info("Migrated 'message.context' -> 'message.text'");
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Migrates config from v2 to v3 (adds update-checker settings).
+     */
+    private boolean migrateV2ToV3(FileConfiguration config) {
+        // Add update-checker settings if they don't exist
+        if (!config.contains("update-checker")) {
+            config.set("update-checker.enabled", true);
+            config.set("update-checker.check-interval", 24);
+            config.set("update-checker.notify-on-join", true);
+            config.set("update-checker.message", 
+                "&e[DisableVillagerTrade] &fA new version is available! &7(%current% → %latest%)");
+            
+            logger.info("Added 'update-checker' settings");
             return true;
         }
         return false;
