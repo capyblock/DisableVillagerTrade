@@ -14,8 +14,14 @@ on:
 
 jobs:
   test:
-    name: Unit Tests
+    name: Unit Tests & Coverage
     runs-on: ubuntu-latest
+    # Skip for docs-only commits (docs:, style:, chore: without code changes)
+    if: |
+      !startsWith(github.event.head_commit.message, 'docs:') &&
+      !startsWith(github.event.head_commit.message, 'docs(') &&
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[ci skip]')
     
     steps:
       - name: Checkout repository
@@ -28,15 +34,21 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests
-        run: mvn test -B
+      - name: Run tests with coverage (90% threshold enforced)
+        run: |
+          echo "🧪 Running tests with coverage..."
+          mvn test -B
+          echo "✅ All tests passed and coverage threshold (90%) met!"
 
-      - name: Generate test report
+      - name: Generate coverage summary
         if: always()
         run: |
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Test Results & Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Test results
           if [ -d "target/surefire-reports" ]; then
-            echo "### Summary" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Test Results" >> $GITHUB_STEP_SUMMARY
             for file in target/surefire-reports/*.txt; do
               if [ -f "$file" ]; then
                 echo '```' >> $GITHUB_STEP_SUMMARY
@@ -45,6 +57,47 @@ jobs:
               fi
             done
           fi
+          
+          # Coverage summary from CSV
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📈 Code Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "target/site/jacoco/jacoco.csv" ]; then
+            echo "| Class | Instructions | Coverage |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------------|----------|" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse CSV (skip header)
+            tail -n +2 target/site/jacoco/jacoco.csv | while IFS=',' read -r group package class missed covered rest; do
+              total=$((missed + covered))
+              if [ $total -gt 0 ]; then
+                pct=$((covered * 100 / total))
+                echo "| \`$class\` | $covered/$total | ${pct}% |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+            
+            # Calculate total
+            TOTAL_MISSED=$(tail -n +2 target/site/jacoco/jacoco.csv | cut -d',' -f4 | paste -sd+ | bc)
+            TOTAL_COVERED=$(tail -n +2 target/site/jacoco/jacoco.csv | cut -d',' -f5 | paste -sd+ | bc)
+            TOTAL=$((TOTAL_MISSED + TOTAL_COVERED))
+            if [ $TOTAL -gt 0 ]; then
+              TOTAL_PCT=$((TOTAL_COVERED * 100 / TOTAL))
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Total Coverage: ${TOTAL_PCT}%** (${TOTAL_COVERED}/${TOTAL} instructions)" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> ℹ️ Minimum required coverage: **90%**" >> $GITHUB_STEP_SUMMARY
+          echo "> Some classes are excluded from coverage (Bukkit runtime dependencies)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: target/site/jacoco/jacoco.xml
+          fail_ci_if_error: false
+          verbose: true
 
       - name: Upload test results
         if: always()
@@ -54,9 +107,23 @@ jobs:
           path: target/surefire-reports/
           retention-days: 7
 
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
+          retention-days: 7
+
   code-analysis:
     name: Code Analysis
     runs-on: ubuntu-latest
+    # Skip for docs-only commits
+    if: |
+      !startsWith(github.event.head_commit.message, 'docs:') &&
+      !startsWith(github.event.head_commit.message, 'docs(') &&
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[ci skip]')
     
     steps:
       - name: Checkout repository
@@ -87,19 +154,29 @@ jobs:
       - name: Generate analysis summary
         if: always()
         run: |
-          echo "## Code Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔬 Code Analysis Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -f "target/spotbugsXml.xml" ]; then
             BUGS=$(grep -c "<BugInstance" target/spotbugsXml.xml 2>/dev/null || echo "0")
             echo "### SpotBugs" >> $GITHUB_STEP_SUMMARY
-            echo "- Bugs found: $BUGS" >> $GITHUB_STEP_SUMMARY
+            if [ "$BUGS" -eq "0" ]; then
+              echo "✅ No bugs found" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Bugs found: $BUGS" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -f "target/pmd.xml" ]; then
             VIOLATIONS=$(grep -c "<violation" target/pmd.xml 2>/dev/null || echo "0")
             echo "### PMD" >> $GITHUB_STEP_SUMMARY
-            echo "- Violations found: $VIOLATIONS" >> $GITHUB_STEP_SUMMARY
+            if [ "$VIOLATIONS" -eq "0" ]; then
+              echo "✅ No violations found" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Violations found: $VIOLATIONS" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
 
       - name: Upload analysis reports
@@ -111,4 +188,3 @@ jobs:
             target/spotbugsXml.xml
             target/pmd.xml
           retention-days: 7
-

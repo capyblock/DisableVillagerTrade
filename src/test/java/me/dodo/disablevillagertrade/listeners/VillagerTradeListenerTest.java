@@ -11,31 +11,48 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("VillagerTradeListener Tests")
 class VillagerTradeListenerTest {
-    
+
     @Test
     @DisplayName("Should implement Listener interface")
     void implementsListener() {
         assertTrue(Listener.class.isAssignableFrom(VillagerTradeListener.class));
     }
-    
+
     @Test
     @DisplayName("Should have @EventHandler annotated method")
     void hasEventHandlerAnnotation() throws NoSuchMethodException {
         Method method = VillagerTradeListener.class.getMethod("onPlayerInteractEntity", PlayerInteractEntityEvent.class);
         assertTrue(method.isAnnotationPresent(EventHandler.class));
     }
-    
+
     @Test
     @DisplayName("Should have BYPASS_PERMISSION constant")
     void hasBypassPermissionConstant() throws NoSuchFieldException {
         var field = VillagerTradeListener.class.getField("BYPASS_PERMISSION");
         assertEquals(String.class, field.getType());
     }
-    
+
     @Test
     @DisplayName("BYPASS_PERMISSION should be correct value")
     void bypassPermissionValue() {
         assertEquals("disabletrade.bypass", VillagerTradeListener.BYPASS_PERMISSION);
     }
-}
 
+    @Test
+    @DisplayName("Should have constructor with DisableVillagerTrade parameter")
+    void hasConstructorWithPlugin() {
+        var constructors = VillagerTradeListener.class.getConstructors();
+        boolean hasPluginConstructor = false;
+
+        for (var constructor : constructors) {
+            var paramTypes = constructor.getParameterTypes();
+            if (paramTypes.length == 1 &&
+                paramTypes[0].getSimpleName().equals("DisableVillagerTrade")) {
+                hasPluginConstructor = true;
+                break;
+            }
+        }
+
+        assertTrue(hasPluginConstructor);
+    }
+}

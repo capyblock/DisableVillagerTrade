@@ -1,0 +1,40 @@
+# Codecov Configuration
+# https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 2%
+        informational: false
+    patch:
+      default:
+        target: 90%
+        threshold: 5%
+
+# Exclude Bukkit runtime-dependent classes
+ignore:
+  - "**/DisableVillagerTrade.java"
+  - "**/VillagerTradeListener.java"
+  - "**/UpdateChecker.java"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no
+
