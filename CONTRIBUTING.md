@@ -112,21 +112,38 @@ Closes #42
 - `fix: correct world name comparison`
 - `docs: update installation instructions`
 
+## Project Structure
+
+```
+src/main/java/me/dodo/disablevillagertrade/
+├── DisableVillagerTrade.java    # Main plugin class
+├── config/
+│   └── PluginConfig.java        # Configuration handling
+├── listeners/
+│   └── VillagerTradeListener.java  # Event listener
+└── logic/
+    └── TradeBlocker.java        # Core business logic (testable)
+```
+
 ## Code Style
 
 - Follow existing code conventions in the project
 - Use meaningful variable and method names
-- Add comments for complex logic
+- Add JavaDocs for public methods
 - Keep methods focused and concise
+- Separate business logic from Bukkit code for testability
 
 ## Testing
 
 Before submitting a PR:
 
-1. Build the project successfully: `mvn clean package`
-2. Test the plugin on a local Spigot/Paper server
-3. Verify your changes work as expected
-4. Check for any console errors or warnings
+1. Run tests: `mvn test`
+2. Build the project: `mvn clean package`
+3. Test the plugin on a local Spigot/Paper server
+4. Verify your changes work as expected
+5. Check for any console errors or warnings
+
+**Note:** All PRs must pass the automated test suite.
 
 ## Reporting Issues
 

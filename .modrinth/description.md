@@ -20,9 +20,12 @@ A lightweight Spigot/Paper plugin that prevents players from trading with villag
 ## ⚙️ Configuration
 
 ```yaml
+# Message settings
 message:
   enabled: true
-  context: "&cYou can't trade with villagers on this server."
+  text: "&cYou can't trade with villagers on this server."
+
+# Worlds where trading is ALLOWED
 disabled-worlds:
   - example-world
 ```

@@ -20,10 +20,16 @@ Disable villager trade on your minecraft spigot based server!
 4. Configure in `plugins/DisableVillagerTrade/config.yml`
 
 ## Configuration
+
 ```yaml
+# Message settings
 message:
+  # Whether to show a message when trading is blocked
   enabled: true
-  context: "&cYou can't trade with villagers on this server."
+  # The message to show (supports color codes with &)
+  text: "&cYou can't trade with villagers on this server."
+
+# Worlds where villager trading is ALLOWED (not blocked)
 disabled-worlds:
   - example-world
 ```
