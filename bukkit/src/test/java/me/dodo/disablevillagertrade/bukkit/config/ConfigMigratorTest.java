@@ -9,9 +9,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.io.File;
+import java.util.Collections;
+import java.util.List;
 import java.util.logging.Logger;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,10 +30,26 @@ class ConfigMigratorTest {
     @Mock
     private Logger mockLogger;
 
+    private File tempDataFolder;
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        tempDataFolder = new File(System.getProperty("java.io.tmpdir"), "test-plugin-" + System.currentTimeMillis());
+        tempDataFolder.mkdirs();
+        
         when(mockPlugin.getConfig()).thenReturn(mockConfig);
         when(mockPlugin.getLogger()).thenReturn(mockLogger);
+        when(mockPlugin.getDataFolder()).thenReturn(tempDataFolder);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (tempDataFolder != null && tempDataFolder.exists()) {
+            for (File file : tempDataFolder.listFiles()) {
+                file.delete();
+            }
+            tempDataFolder.delete();
+        }
     }
 
     @Nested
@@ -44,9 +62,8 @@ class ConfigMigratorTest {
             when(mockConfig.getInt("config-version", 1)).thenReturn(3);
 
             ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
-            boolean result = migrator.migrateIfNeeded();
+            migrator.migrateIfNeeded();
 
-            assertFalse(result);
             verify(mockPlugin, never()).saveConfig();
         }
 
@@ -56,9 +73,8 @@ class ConfigMigratorTest {
             when(mockConfig.getInt("config-version", 1)).thenReturn(4);
 
             ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
-            boolean result = migrator.migrateIfNeeded();
+            migrator.migrateIfNeeded();
 
-            assertFalse(result);
             verify(mockPlugin, never()).saveConfig();
         }
     }
@@ -68,35 +84,36 @@ class ConfigMigratorTest {
     class V1ToV2MigrationTests {
 
         @Test
-        @DisplayName("Should migrate message.context to message.text")
-        void shouldMigrateContextToText() {
+        @DisplayName("Should migrate old message format to message.text")
+        void shouldMigrateOldMessageFormat() {
             when(mockConfig.getInt("config-version", 1)).thenReturn(1);
-            when(mockConfig.contains("message.context")).thenReturn(true);
-            when(mockConfig.getString("message.context")).thenReturn("&cOld message");
+            when(mockConfig.getString("message")).thenReturn("&cOld message");
+            when(mockConfig.contains("message.text")).thenReturn(false);
             when(mockConfig.contains("update-checker")).thenReturn(true);
+            when(mockConfig.getStringList("world-blacklist")).thenReturn(Collections.emptyList());
 
             ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
-            boolean result = migrator.migrateIfNeeded();
+            migrator.migrateIfNeeded();
 
-            assertTrue(result);
+            verify(mockConfig).set("message.enabled", true);
             verify(mockConfig).set("message.text", "&cOld message");
-            verify(mockConfig).set("message.context", null);
             verify(mockConfig).set("config-version", 3);
             verify(mockPlugin).saveConfig();
         }
 
         @Test
-        @DisplayName("Should not migrate when message.context does not exist")
-        void shouldNotMigrateWhenContextDoesNotExist() {
+        @DisplayName("Should not migrate when message.text already exists")
+        void shouldNotMigrateWhenMessageTextExists() {
             when(mockConfig.getInt("config-version", 1)).thenReturn(1);
-            when(mockConfig.contains("message.context")).thenReturn(false);
+            when(mockConfig.getString("message")).thenReturn("&cOld message");
+            when(mockConfig.contains("message.text")).thenReturn(true);
             when(mockConfig.contains("update-checker")).thenReturn(true);
+            when(mockConfig.getStringList("world-blacklist")).thenReturn(Collections.emptyList());
 
             ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
-            boolean result = migrator.migrateIfNeeded();
+            migrator.migrateIfNeeded();
 
-            assertFalse(result);
-            verify(mockConfig, never()).set(eq("message.text"), anyString());
+            verify(mockConfig, never()).set(eq("message.enabled"), anyBoolean());
             verify(mockConfig).set("config-version", 3);
             verify(mockPlugin).saveConfig();
         }
@@ -111,11 +128,11 @@ class ConfigMigratorTest {
         void shouldAddUpdateCheckerSettings() {
             when(mockConfig.getInt("config-version", 1)).thenReturn(2);
             when(mockConfig.contains("update-checker")).thenReturn(false);
+            when(mockConfig.getStringList("world-blacklist")).thenReturn(Collections.emptyList());
 
             ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
-            boolean result = migrator.migrateIfNeeded();
+            migrator.migrateIfNeeded();
 
-            assertTrue(result);
             verify(mockConfig).set("update-checker.enabled", true);
             verify(mockConfig).set("update-checker.check-interval", 24);
             verify(mockConfig).set("update-checker.notify-on-join", true);
@@ -129,12 +146,29 @@ class ConfigMigratorTest {
         void shouldNotAddUpdateCheckerWhenPresent() {
             when(mockConfig.getInt("config-version", 1)).thenReturn(2);
             when(mockConfig.contains("update-checker")).thenReturn(true);
+            when(mockConfig.getStringList("world-blacklist")).thenReturn(Collections.emptyList());
 
             ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
-            boolean result = migrator.migrateIfNeeded();
+            migrator.migrateIfNeeded();
 
-            assertFalse(result);
             verify(mockConfig, never()).set(eq("update-checker.enabled"), anyBoolean());
+            verify(mockConfig).set("config-version", 3);
+            verify(mockPlugin).saveConfig();
+        }
+
+        @Test
+        @DisplayName("Should migrate world-blacklist to disabled-worlds")
+        void shouldMigrateWorldBlacklist() {
+            when(mockConfig.getInt("config-version", 1)).thenReturn(2);
+            when(mockConfig.contains("update-checker")).thenReturn(true);
+            when(mockConfig.getStringList("world-blacklist")).thenReturn(List.of("world1", "world2"));
+            when(mockConfig.contains("disabled-worlds")).thenReturn(false);
+
+            ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
+            migrator.migrateIfNeeded();
+
+            verify(mockConfig).set("disabled-worlds", List.of("world1", "world2"));
+            verify(mockConfig).set("world-blacklist", null);
             verify(mockConfig).set("config-version", 3);
             verify(mockPlugin).saveConfig();
         }
@@ -148,23 +182,22 @@ class ConfigMigratorTest {
         @DisplayName("Should perform full migration from v1 to v3")
         void shouldPerformFullMigration() {
             when(mockConfig.getInt("config-version", 1)).thenReturn(1);
-            when(mockConfig.contains("message.context")).thenReturn(true);
-            when(mockConfig.getString("message.context")).thenReturn("&cOld message");
+            when(mockConfig.getString("message")).thenReturn("&cOld message");
+            when(mockConfig.contains("message.text")).thenReturn(false);
             when(mockConfig.contains("update-checker")).thenReturn(false);
+            when(mockConfig.getStringList("world-blacklist")).thenReturn(Collections.emptyList());
 
             ConfigMigrator migrator = new ConfigMigrator(mockPlugin);
-            boolean result = migrator.migrateIfNeeded();
+            migrator.migrateIfNeeded();
 
-            assertTrue(result);
             // V1 to V2
+            verify(mockConfig).set("message.enabled", true);
             verify(mockConfig).set("message.text", "&cOld message");
-            verify(mockConfig).set("message.context", null);
             // V2 to V3
             verify(mockConfig).set("update-checker.enabled", true);
             verify(mockConfig).set("config-version", 3);
             verify(mockPlugin).saveConfig();
-            verify(mockLogger).info("Config migration complete!");
+            verify(mockLogger).info("Configuration migrated to version 3");
         }
     }
 }
-

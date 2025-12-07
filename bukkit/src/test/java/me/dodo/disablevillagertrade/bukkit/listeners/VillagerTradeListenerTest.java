@@ -1,5 +1,6 @@
 package me.dodo.disablevillagertrade.bukkit.listeners;
 
+import me.dodo.disablevillagertrade.common.Constants;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
@@ -26,16 +27,9 @@ class VillagerTradeListenerTest {
     }
 
     @Test
-    @DisplayName("Should have BYPASS_PERMISSION constant")
-    void hasBypassPermissionConstant() throws NoSuchFieldException {
-        var field = VillagerTradeListener.class.getField("BYPASS_PERMISSION");
-        assertEquals(String.class, field.getType());
-    }
-
-    @Test
-    @DisplayName("BYPASS_PERMISSION should be correct value")
+    @DisplayName("Constants.PERMISSION_BYPASS should have correct value")
     void bypassPermissionValue() {
-        assertEquals("disabletrade.bypass", VillagerTradeListener.BYPASS_PERMISSION);
+        assertEquals("disabletrade.bypass", Constants.PERMISSION_BYPASS);
     }
 
     @Test
@@ -56,4 +50,3 @@ class VillagerTradeListenerTest {
         assertTrue(hasPluginConstructor);
     }
 }
-

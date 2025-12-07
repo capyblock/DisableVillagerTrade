@@ -1,5 +1,5 @@
 plugins {
-    id("fabric-loom") version "1.14.4"
+    id("fabric-loom") version "1.13-SNAPSHOT"
 }
 
 val minecraftVersion: String by project

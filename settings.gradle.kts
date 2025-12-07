@@ -14,5 +14,5 @@ rootProject.name = "DisableVillagerTrade"
 include("common")
 include("bukkit")
 include("fabric")
-include("forge")
+// include("forge") // Temporarily disabled - LWJGL native issue on macOS
 include("neoforge")

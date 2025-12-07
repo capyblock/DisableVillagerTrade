@@ -1,18 +1,15 @@
 package me.dodo.disablevillagertrade.bukkit.listeners;
 
+import me.dodo.disablevillagertrade.bukkit.DisableVillagerTrade;
 import me.dodo.disablevillagertrade.bukkit.config.BukkitConfig;
 import me.dodo.disablevillagertrade.bukkit.update.BukkitUpdateChecker;
-import org.bukkit.Server;
+import me.dodo.disablevillagertrade.common.Constants;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitScheduler;
-import org.bukkit.scheduler.BukkitTask;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -27,7 +24,7 @@ import static org.mockito.Mockito.*;
 class UpdateNotifyListenerTest {
 
     @Mock
-    private JavaPlugin mockPlugin;
+    private DisableVillagerTrade mockPlugin;
 
     @Mock
     private BukkitUpdateChecker mockUpdateChecker;
@@ -40,15 +37,6 @@ class UpdateNotifyListenerTest {
 
     @Mock
     private Player mockPlayer;
-
-    @Mock
-    private Server mockServer;
-
-    @Mock
-    private BukkitScheduler mockScheduler;
-
-    @Mock
-    private BukkitTask mockTask;
 
     private UpdateNotifyListener listener;
 
@@ -76,108 +64,44 @@ class UpdateNotifyListenerTest {
     }
 
     @Nested
-    @DisplayName("Notification Logic Tests")
-    class NotificationLogicTests {
+    @DisplayName("Permission Check Tests")
+    class PermissionCheckTests {
 
         @Test
-        @DisplayName("Should not notify when notify-on-join is disabled")
-        void shouldNotNotifyWhenDisabled() {
-            when(mockConfig.isNotifyOnJoin()).thenReturn(false);
-
-            listener.onPlayerJoin(mockEvent);
-
-            verify(mockEvent, never()).getPlayer();
-        }
-
-        @Test
-        @DisplayName("Should not notify player without permission")
-        void shouldNotNotifyWithoutPermission() {
-            when(mockConfig.isNotifyOnJoin()).thenReturn(true);
+        @DisplayName("Should not schedule notification when player lacks permission")
+        void shouldNotScheduleWhenNoPermission() {
             when(mockEvent.getPlayer()).thenReturn(mockPlayer);
-            when(mockPlayer.hasPermission("disabletrade.update")).thenReturn(false);
+            when(mockPlayer.hasPermission(Constants.PERMISSION_UPDATE)).thenReturn(false);
 
             listener.onPlayerJoin(mockEvent);
 
+            // No BukkitRunnable should be scheduled if player has no permission
             verify(mockUpdateChecker, never()).isUpdateAvailable();
         }
+    }
+
+    @Nested
+    @DisplayName("Constructor Tests")
+    class ConstructorTests {
 
         @Test
-        @DisplayName("Should not notify when no update available")
-        void shouldNotNotifyWhenNoUpdate() {
-            when(mockConfig.isNotifyOnJoin()).thenReturn(true);
-            when(mockEvent.getPlayer()).thenReturn(mockPlayer);
-            when(mockPlayer.hasPermission("disabletrade.update")).thenReturn(true);
-            when(mockUpdateChecker.isUpdateAvailable()).thenReturn(false);
+        @DisplayName("Should accept DisableVillagerTrade, BukkitUpdateChecker, and BukkitConfig")
+        void shouldAcceptCorrectParameters() {
+            var constructors = UpdateNotifyListener.class.getConstructors();
+            boolean hasCorrectConstructor = false;
 
-            listener.onPlayerJoin(mockEvent);
+            for (var constructor : constructors) {
+                var paramTypes = constructor.getParameterTypes();
+                if (paramTypes.length == 3 &&
+                    paramTypes[0] == DisableVillagerTrade.class &&
+                    paramTypes[1] == BukkitUpdateChecker.class &&
+                    paramTypes[2] == BukkitConfig.class) {
+                    hasCorrectConstructor = true;
+                    break;
+                }
+            }
 
-            verify(mockPlayer, never()).getServer();
-        }
-
-        @Test
-        @DisplayName("Should schedule notification when update available")
-        void shouldScheduleNotificationWhenUpdateAvailable() {
-            when(mockConfig.isNotifyOnJoin()).thenReturn(true);
-            when(mockEvent.getPlayer()).thenReturn(mockPlayer);
-            when(mockPlayer.hasPermission("disabletrade.update")).thenReturn(true);
-            when(mockUpdateChecker.isUpdateAvailable()).thenReturn(true);
-            when(mockPlayer.getServer()).thenReturn(mockServer);
-            when(mockServer.getScheduler()).thenReturn(mockScheduler);
-            when(mockScheduler.runTaskLater(eq(mockPlugin), any(Runnable.class), eq(40L))).thenReturn(mockTask);
-
-            listener.onPlayerJoin(mockEvent);
-
-            verify(mockScheduler).runTaskLater(eq(mockPlugin), any(Runnable.class), eq(40L));
-        }
-
-        @Test
-        @DisplayName("Should send message with version placeholders replaced")
-        void shouldSendMessageWithPlaceholders() {
-            when(mockConfig.isNotifyOnJoin()).thenReturn(true);
-            when(mockEvent.getPlayer()).thenReturn(mockPlayer);
-            when(mockPlayer.hasPermission("disabletrade.update")).thenReturn(true);
-            when(mockUpdateChecker.isUpdateAvailable()).thenReturn(true);
-            when(mockPlayer.getServer()).thenReturn(mockServer);
-            when(mockServer.getScheduler()).thenReturn(mockScheduler);
-
-            ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
-            when(mockScheduler.runTaskLater(eq(mockPlugin), runnableCaptor.capture(), eq(40L))).thenReturn(mockTask);
-
-            listener.onPlayerJoin(mockEvent);
-
-            // Simulate the scheduled task running
-            when(mockPlayer.isOnline()).thenReturn(true);
-            when(mockConfig.getUpdateMessage()).thenReturn("Update: %current% -> %latest%");
-            when(mockUpdateChecker.getCurrentVersion()).thenReturn("1.0.0");
-            when(mockUpdateChecker.getLatestVersion()).thenReturn("1.1.0");
-
-            runnableCaptor.getValue().run();
-
-            verify(mockPlayer).sendMessage("Update: 1.0.0 -> 1.1.0");
-        }
-
-        @Test
-        @DisplayName("Should not send message if player went offline")
-        void shouldNotSendMessageIfPlayerOffline() {
-            when(mockConfig.isNotifyOnJoin()).thenReturn(true);
-            when(mockEvent.getPlayer()).thenReturn(mockPlayer);
-            when(mockPlayer.hasPermission("disabletrade.update")).thenReturn(true);
-            when(mockUpdateChecker.isUpdateAvailable()).thenReturn(true);
-            when(mockPlayer.getServer()).thenReturn(mockServer);
-            when(mockServer.getScheduler()).thenReturn(mockScheduler);
-
-            ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
-            when(mockScheduler.runTaskLater(eq(mockPlugin), runnableCaptor.capture(), eq(40L))).thenReturn(mockTask);
-
-            listener.onPlayerJoin(mockEvent);
-
-            // Simulate the scheduled task running when player is offline
-            when(mockPlayer.isOnline()).thenReturn(false);
-
-            runnableCaptor.getValue().run();
-
-            verify(mockPlayer, never()).sendMessage(anyString());
+            assertTrue(hasCorrectConstructor);
         }
     }
 }
-

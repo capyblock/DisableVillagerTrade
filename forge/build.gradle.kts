@@ -1,5 +1,5 @@
 plugins {
-    id("net.minecraftforge.gradle") version "6.0.+"
+    id("net.minecraftforge.gradle") version "[6.0.16,6.2)"
 }
 
 val minecraftVersion: String by project
