@@ -9,14 +9,13 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.listener.SubscribeEvent;
 
 /**
  * Handles villager interaction events for Forge.
+ * Uses Forge 60.x event handler pattern (no @SubscribeEvent annotation).
  */
 public class VillagerTradeHandler {
     
-    @SubscribeEvent
     public void onPlayerInteractEntity(PlayerInteractEvent.EntityInteract event) {
         // Only process villager interactions
         if (!(event.getTarget() instanceof Villager villager)) {
@@ -32,6 +31,8 @@ public class VillagerTradeHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
+        
+        ForgeConfig config = DisableVillagerTradeForge.getConfig();
         
         // Get profession name - profession() returns Holder<VillagerProfession>
         Holder<VillagerProfession> professionHolder = villager.getVillagerData().profession();
@@ -52,20 +53,17 @@ public class VillagerTradeHandler {
             !villager.isNoAi(),      // hasAI is inverted
             !villager.isNoGravity(), // hasGravity is inverted
             dimensionName,
-            ForgeConfig.DISABLED_DIMENSIONS.get().stream()
-                .map(Object::toString)
-                .toList(),
+            config.getDisabledWorlds(),
             hasBypass
         );
         
         if (shouldBlock) {
-            // Cancel the interaction using setCancellationResult only
-            // In Forge 60.x, EntityInteract doesn't have setCanceled()
+            // Cancel the interaction - use setCancellationResult for Forge 60.x
             event.setCancellationResult(InteractionResult.FAIL);
             
             // Send message to player
-            if (ForgeConfig.MESSAGE_ENABLED.get()) {
-                player.sendSystemMessage(Component.literal(ForgeConfig.MESSAGE_TEXT.get()));
+            if (config.isMessageEnabled()) {
+                player.sendSystemMessage(Component.literal(config.getMessage()));
             }
         }
     }
