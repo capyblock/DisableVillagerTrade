@@ -3,10 +3,14 @@ name: Auto Release
 on:
   push:
     branches:
-      - master
+      - master   # Production releases
+      - develop  # Development builds
 
 permissions:
   contents: write
+
+env:
+  JAVA_VERSION: '21'
 
 jobs:
   release:
@@ -21,16 +25,32 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up JDK 21
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
           cache: maven
 
+      - name: Determine release type
+        id: release_type
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          
+          if [ "$BRANCH" = "master" ]; then
+            echo "is_production=true" >> $GITHUB_OUTPUT
+            echo "suffix=" >> $GITHUB_OUTPUT
+            echo "📦 Production Release"
+          else
+            echo "is_production=false" >> $GITHUB_OUTPUT
+            echo "suffix=-dev" >> $GITHUB_OUTPUT
+            echo "🔧 Development Build"
+          fi
+
       - name: Run tests
         run: |
-          echo "🧪 Running tests before release..."
+          echo "🧪 Running tests..."
           mvn test -B
           echo "✅ All tests passed!"
 
@@ -38,35 +58,34 @@ jobs:
         id: current_version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          # Remove any existing suffix
+          VERSION=$(echo "$VERSION" | sed 's/-dev.*//g' | sed 's/-SNAPSHOT//g')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 
       - name: Determine version bump from commits
         id: bump
         run: |
-          # Get commits since last tag (or all commits if no tag exists)
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Get commits since last production tag
+          LAST_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | grep -v "dev" | head -n1 || echo "")
           
           if [ -z "$LAST_TAG" ]; then
             echo "No previous tag found, analyzing all commits"
             COMMITS=$(git log --pretty=format:"%s" --no-merges)
           else
-            echo "Last tag: $LAST_TAG"
+            echo "Last production tag: $LAST_TAG"
             COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s" --no-merges)
           fi
           
           echo "Commits to analyze:"
           echo "$COMMITS"
           
-          # Determine bump type based on conventional commits
           BUMP_TYPE="patch"
           
           if echo "$COMMITS" | grep -qiE "^(BREAKING CHANGE|.*!:)"; then
             BUMP_TYPE="major"
           elif echo "$COMMITS" | grep -qiE "^(feat|feature)(\(.*\))?:"; then
             BUMP_TYPE="minor"
-          elif echo "$COMMITS" | grep -qiE "^(fix|bugfix|hotfix)(\(.*\))?:"; then
-            BUMP_TYPE="patch"
           fi
           
           echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
@@ -77,8 +96,8 @@ jobs:
         run: |
           CURRENT="${{ steps.current_version.outputs.version }}"
           BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
+          IS_PRODUCTION="${{ steps.release_type.outputs.is_production }}"
           
-          # Parse version (handles both X.Y and X.Y.Z formats)
           IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
           MAJOR=${VERSION_PARTS[0]:-0}
           MINOR=${VERSION_PARTS[1]:-0}
@@ -99,15 +118,26 @@ jobs:
               ;;
           esac
           
-          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          
+          if [ "$IS_PRODUCTION" = "true" ]; then
+            NEW_VERSION="$BASE_VERSION"
+          else
+            # Dev builds get commit count suffix
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            NEW_VERSION="${BASE_VERSION}-dev.${COMMIT_COUNT}"
+          fi
+          
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
 
       - name: Sync with remote
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git pull --rebase origin master
+          git pull --rebase origin ${{ steps.release_type.outputs.branch }}
 
       - name: Update version in pom.xml
         run: |
@@ -118,18 +148,17 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      - name: Generate changelog and summary
+      - name: Generate changelog
         id: changelog
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          LAST_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | grep -v "dev" | head -n1 || echo "")
           
           if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"%s|%h" --no-merges)
+            COMMITS=$(git log --pretty=format:"%s|%h" --no-merges -20)
           else
             COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s|%h" --no-merges)
           fi
           
-          # Categorize commits
           FEATURES=""
           FIXES=""
           OTHER=""
@@ -140,55 +169,45 @@ jobs:
               FEATURES="${FEATURES}- ${msg} (\`${hash}\`)\n"
             elif echo "$msg" | grep -qiE "^fix(\(.*\))?:"; then
               FIXES="${FIXES}- ${msg} (\`${hash}\`)\n"
-            elif echo "$msg" | grep -qiE "^(chore|docs|style|refactor|perf|test)(\(.*\))?:"; then
-              OTHER="${OTHER}- ${msg} (\`${hash}\`)\n"
             else
               OTHER="${OTHER}- ${msg} (\`${hash}\`)\n"
             fi
           done <<< "$COMMITS"
           
-          # Build changelog
           CHANGELOG=""
-          if [ -n "$FEATURES" ]; then
-            CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"
-          fi
-          if [ -n "$FIXES" ]; then
-            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n"
-          fi
-          if [ -n "$OTHER" ]; then
-            CHANGELOG="${CHANGELOG}### 🔧 Other Changes\n${OTHER}\n"
-          fi
+          [ -n "$FEATURES" ] && CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"
+          [ -n "$FIXES" ] && CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n"
+          [ -n "$OTHER" ] && CHANGELOG="${CHANGELOG}### 🔧 Other Changes\n${OTHER}\n"
           
-          # Generate summary (count of changes)
           FEAT_COUNT=$(echo -e "$FEATURES" | grep -c "^-" || echo "0")
           FIX_COUNT=$(echo -e "$FIXES" | grep -c "^-" || echo "0")
           
           SUMMARY=""
-          [ "$FEAT_COUNT" -gt 0 ] && SUMMARY="${SUMMARY}${FEAT_COUNT} new feature(s)"
+          [ "$FEAT_COUNT" -gt 0 ] && SUMMARY="${FEAT_COUNT} new feature(s)"
           [ "$FIX_COUNT" -gt 0 ] && [ -n "$SUMMARY" ] && SUMMARY="${SUMMARY}, "
           [ "$FIX_COUNT" -gt 0 ] && SUMMARY="${SUMMARY}${FIX_COUNT} bug fix(es)"
-          [ -z "$SUMMARY" ] && SUMMARY="Maintenance release"
+          [ -z "$SUMMARY" ] && SUMMARY="Maintenance update"
           
-          # Output
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
+      # Only commit version bump for production releases
       - name: Commit version bump
+        if: steps.release_type.outputs.is_production == 'true'
         run: |
           git add pom.xml
-          git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }} [skip ci]"
+          git commit -m "chore: release v${{ steps.new_version.outputs.new_version }} [skip ci]"
           git push origin master
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.new_version.outputs.new_version }}
-          name: DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}
+          name: "${{ steps.release_type.outputs.is_production == 'true' && '🚀' || '🔧' }} DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}"
           body: |
-            > ${{ steps.changelog.outputs.summary }}
+            ${{ steps.release_type.outputs.is_production == 'true' && '> **Stable Release**' || '> **Development Build** - For testing only, may be unstable' }} - ${{ steps.changelog.outputs.summary }}
             
             ## What's Changed
             
@@ -199,38 +218,29 @@ jobs:
             1. Download `disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar` below
             2. Place it in your server's `plugins` folder
             3. Restart your server
-            4. Configure in `plugins/DisableVillagerTrade/config.yml`
             
             ## 📋 Requirements
             
             - **Minecraft**: 1.14 - 1.21.4+
-            - **Server**: Spigot, Paper, Purpur, or compatible forks
+            - **Server**: Spigot, Paper, Purpur
             - **Java**: 21+
-            
-            ## 🔗 Links
-            
-            - [Modrinth](https://modrinth.com/plugin/disablevillagertrade)
-            - [Source Code](https://github.com/capyblock/DisableVillagerTrade)
-            - [Report Issues](https://github.com/capyblock/DisableVillagerTrade/issues)
-          files: |
-            target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
+          files: target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.release_type.outputs.is_production != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Only publish to Modrinth for production releases
       - name: Publish to Modrinth
+        if: steps.release_type.outputs.is_production == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          
           files: target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
-          
           name: v${{ steps.new_version.outputs.new_version }} - ${{ steps.changelog.outputs.summary }}
           version: ${{ steps.new_version.outputs.new_version }}
           version-type: release
-          
           loaders: |
             spigot
             paper
@@ -273,62 +283,22 @@ jobs:
             1.21.2
             1.21.3
             1.21.4
-          
           changelog: |
-            ## Release Summary
-            > ${{ steps.changelog.outputs.summary }}
-            
+            ## What's New
             ${{ steps.changelog.outputs.changelog }}
             
-            ---
-            
-            **Full Changelog**: [GitHub Releases](https://github.com/capyblock/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+            **Full Changelog**: [GitHub](https://github.com/capyblock/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
         continue-on-error: true
 
-      - name: Update Modrinth Project Description
-        if: vars.MODRINTH_PROJECT_ID != ''
+      - name: Update Modrinth Description
+        if: steps.release_type.outputs.is_production == 'true' && vars.MODRINTH_PROJECT_ID != ''
         run: |
-          # Read description and summary from files
           DESCRIPTION=$(cat .modrinth/description.md)
           SUMMARY=$(tr -d '\n' < .modrinth/summary.txt | head -c 255)
           
-          echo "Summary to update: $SUMMARY"
-          echo "Summary length: ${#SUMMARY}"
-          
-          # Update project via Modrinth API
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "https://api.modrinth.com/v2/project/${{ vars.MODRINTH_PROJECT_ID }}" \
+          curl -s -X PATCH "https://api.modrinth.com/v2/project/${{ vars.MODRINTH_PROJECT_ID }}" \
             -H "Authorization: ${{ secrets.MODRINTH_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg body "$DESCRIPTION" \
-              --arg summary "$SUMMARY" \
-              '{body: $body, summary: $summary}')")
-          
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-          
-          echo "Response code: $HTTP_CODE"
-          echo "Response body: $BODY"
-          
-          if [ "$HTTP_CODE" -eq 204 ] || [ "$HTTP_CODE" -eq 200 ]; then
-            echo "✅ Updated Modrinth project description and summary"
-          else
-            echo "❌ Failed to update Modrinth project"
-            exit 1
-          fi
+            -d "$(jq -n --arg body "$DESCRIPTION" --arg summary "$SUMMARY" '{body: $body, summary: $summary}')" \
+            && echo "✅ Updated Modrinth description" || echo "⚠️ Failed to update description"
         continue-on-error: true
-
-      # Hangar auto-release is disabled for now
-      # To re-enable, uncomment the section below and set up HANGAR_TOKEN secret and HANGAR_PROJECT_ID variable
-      # - name: Publish to Hangar
-      #   uses: HangarMC/upload-action@v1
-      #   with:
-      #     api-key: ${{ secrets.HANGAR_TOKEN }}
-      #     slug: ${{ vars.HANGAR_PROJECT_ID }}
-      #     version: ${{ steps.new_version.outputs.new_version }}
-      #     channel: Release
-      #     files: '{"PAPER": "target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar"}'
-      #     platform-versions: '{"PAPER": ["1.14-1.21.4"]}'
-      #     changelog: ${{ steps.changelog.outputs.changelog }}
-      #   continue-on-error: true
-

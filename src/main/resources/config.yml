@@ -1,5 +1,17 @@
+# DisableVillagerTrade Configuration
+# https://github.com/capyblock/DisableVillagerTrade
+
+# DO NOT CHANGE - Used for automatic config migration
+config-version: 2
+
+# Message settings
 message:
+  # Whether to show a message when trading is blocked
   enabled: true
-  context: "&cYou can't trade with villagers on this server."
+  # The message to show (supports color codes with &)
+  text: "&cYou can't trade with villagers on this server."
+
+# Worlds where villager trading is ALLOWED (not blocked)
+# Add world names here to enable trading in specific worlds
 disabled-worlds:
   - example-world

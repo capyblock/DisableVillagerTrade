@@ -1,12 +1,13 @@
 name: DisableVillagerTrade
 version: '${project.version}'
 main: me.dodo.disablevillagertrade.DisableVillagerTrade
-prefix: DisableVillagerTrade
-api-version: '1.14'
-authors: [ dodo ]
-description: Disable villager trade. Supports Minecraft 1.14 - 1.21.4+
-website: https://github.com/dodoflix/DisableVillagerTrade
+api-version: '1.21'
+authors:
+  - dodo
+description: A lightweight plugin to prevent players from trading with villagers.
+website: https://github.com/capyblock/DisableVillagerTrade
 
 permissions:
   disabletrade.bypass:
-    description: "The player with this permission can trade with villagers."
+    description: Allows the player to bypass the trade block and trade with villagers.
+    default: op
