@@ -1,1 +1,1 @@
-A lightweight plugin to prevent players from trading with villagers. Features bypass permissions, per-world config, and customizable messages.
+A lightweight plugin to prevent players from trading with villagers.
