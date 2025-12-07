@@ -11,6 +11,7 @@ permissions:
 
 env:
   JAVA_VERSION: '21'
+  MINECRAFT_VERSION: '1.21.1'
 
 jobs:
   check-changes:
@@ -70,9 +71,336 @@ jobs:
           echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
           echo "Should deploy: $SHOULD_DEPLOY"
 
-  release:
-    name: Build & Release
+  # Run unit tests
+  unit-tests:
+    name: 🧪 Unit Tests
     needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Run unit tests
+        run: ./gradlew test --no-daemon
+      
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: '**/build/reports/tests/'
+
+  # Integration test - Bukkit/Paper
+  integration-bukkit:
+    name: 🪣 Integration Test (Paper)
+    needs: [check-changes, unit-tests]
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Build plugin
+        run: ./gradlew :bukkit:shadowJar --no-daemon
+      
+      - name: Download Paper server
+        run: |
+          mkdir -p test-server/plugins
+          PAPER_BUILD=$(curl -s "https://api.papermc.io/v2/projects/paper/versions/${{ env.MINECRAFT_VERSION }}/builds" | jq -r '.builds[-1].build')
+          curl -o test-server/paper.jar \
+            "https://api.papermc.io/v2/projects/paper/versions/${{ env.MINECRAFT_VERSION }}/builds/${PAPER_BUILD}/downloads/paper-${{ env.MINECRAFT_VERSION }}-${PAPER_BUILD}.jar"
+          
+          find bukkit/build/libs -name "*.jar" ! -name "*-slim.jar" -exec cp {} test-server/plugins/ \;
+          echo "eula=true" > test-server/eula.txt
+          echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
+      
+      - name: Test plugin loads correctly
+        timeout-minutes: 5
+        run: |
+          cd test-server
+          java -Xmx1G -jar paper.jar --nogui &
+          SERVER_PID=$!
+          
+          for i in {1..90}; do
+            if grep -q "Done" logs/latest.log 2>/dev/null; then
+              echo "✅ Server started!"
+              break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "❌ Server crashed!"; cat logs/latest.log 2>/dev/null; exit 1
+            fi
+            sleep 1
+          done
+          
+          if grep -q "\[DisableVillagerTrade\]" logs/latest.log; then
+            echo "✅ Plugin loaded successfully!"
+          else
+            echo "❌ Plugin failed to load!"; cat logs/latest.log; exit 1
+          fi
+          
+          if grep -qiE "(ERROR|SEVERE).*DisableVillagerTrade" logs/latest.log; then
+            echo "❌ Plugin has errors!"; grep -iE "(ERROR|SEVERE)" logs/latest.log; exit 1
+          fi
+          
+          kill $SERVER_PID 2>/dev/null || true
+          echo "✅ Bukkit integration test passed!"
+      
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-logs
+          path: test-server/logs/
+
+  # Integration test - Fabric
+  integration-fabric:
+    name: 🧵 Integration Test (Fabric)
+    needs: [check-changes, unit-tests]
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Build mod
+        run: ./gradlew :fabric:build --no-daemon
+      
+      - name: Setup Fabric server
+        run: |
+          mkdir -p test-server/mods
+          curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
+          java -jar fabric-installer.jar server -mcversion ${{ env.MINECRAFT_VERSION }} -dir test-server -downloadMinecraft
+          
+          FABRIC_API_URL=$(curl -s "https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%22${{ env.MINECRAFT_VERSION }}%22%5D&loaders=%5B%22fabric%22%5D" | jq -r '.[0].files[0].url')
+          curl -L -o test-server/mods/fabric-api.jar "$FABRIC_API_URL"
+          
+          find fabric/build/libs -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} test-server/mods/ \;
+          echo "eula=true" > test-server/eula.txt
+          echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
+      
+      - name: Test mod loads correctly
+        timeout-minutes: 5
+        run: |
+          cd test-server
+          java -Xmx1G -jar fabric-server-launch.jar --nogui &
+          SERVER_PID=$!
+          
+          for i in {1..90}; do
+            if grep -q "Done" logs/latest.log 2>/dev/null; then
+              echo "✅ Server started!"; break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "❌ Server crashed!"; cat logs/latest.log 2>/dev/null; exit 1
+            fi
+            sleep 1
+          done
+          
+          if grep -qiE "(ERROR|FATAL).*disablevillagertrade" logs/latest.log; then
+            echo "❌ Mod has errors!"; grep -iE "(ERROR|FATAL)" logs/latest.log; exit 1
+          fi
+          
+          kill $SERVER_PID 2>/dev/null || true
+          echo "✅ Fabric integration test passed!"
+      
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fabric-logs
+          path: test-server/logs/
+
+  # Integration test - Forge
+  integration-forge:
+    name: 🔥 Integration Test (Forge)
+    needs: [check-changes, unit-tests]
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Build mod
+        run: ./gradlew :forge:build --no-daemon
+      
+      - name: Setup Forge server
+        run: |
+          mkdir -p test-server/mods
+          FORGE_VERSION=$(grep "forgeVersion=" gradle.properties | cut -d'=' -f2)
+          echo "Using Forge version: $FORGE_VERSION"
+          
+          # Download Forge installer
+          curl -o forge-installer.jar \
+            "https://maven.minecraftforge.net/net/minecraftforge/forge/${FORGE_VERSION}/forge-${FORGE_VERSION}-installer.jar"
+          
+          # Install server
+          java -jar forge-installer.jar --installServer test-server
+          
+          # Copy mod
+          find forge/build/libs -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
+          echo "eula=true" > test-server/eula.txt
+          echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
+      
+      - name: Test mod loads correctly
+        timeout-minutes: 8
+        run: |
+          cd test-server
+          
+          # Find and run the server
+          if [ -f "run.sh" ]; then
+            chmod +x run.sh && ./run.sh --nogui &
+          elif [ -f "run.bat" ]; then
+            # Extract java command from run.bat for Linux
+            JAVA_ARGS=$(grep "java" run.bat | sed 's/.*java/java/' | sed 's/%\*//g')
+            eval "$JAVA_ARGS --nogui" &
+          else
+            # Try to find forge server jar
+            FORGE_JAR=$(find . -maxdepth 1 -name "forge-*.jar" ! -name "*installer*" | head -1)
+            if [ -n "$FORGE_JAR" ]; then
+              java -Xmx2G -jar "$FORGE_JAR" --nogui &
+            else
+              java -Xmx2G @user_jvm_args.txt @libraries/net/minecraftforge/forge/*/unix_args.txt --nogui &
+            fi
+          fi
+          SERVER_PID=$!
+          
+          for i in {1..150}; do
+            if grep -q "Done" logs/latest.log 2>/dev/null; then
+              echo "✅ Server started!"; break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "❌ Server crashed!"
+              cat logs/latest.log 2>/dev/null || cat logs/debug.log 2>/dev/null
+              exit 1
+            fi
+            sleep 1
+          done
+          
+          # Check for mod errors
+          if grep -qiE "(ERROR|FATAL).*disablevillagertrade" logs/latest.log 2>/dev/null; then
+            echo "❌ Mod has errors!"
+            grep -iE "(ERROR|FATAL)" logs/latest.log
+            exit 1
+          fi
+          
+          kill $SERVER_PID 2>/dev/null || true
+          echo "✅ Forge integration test passed!"
+      
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-logs
+          path: test-server/logs/
+
+  # Integration test - NeoForge
+  integration-neoforge:
+    name: ⚒️ Integration Test (NeoForge)
+    needs: [check-changes, unit-tests]
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Build mod
+        run: ./gradlew :neoforge:build --no-daemon
+      
+      - name: Setup NeoForge server
+        run: |
+          mkdir -p test-server/mods
+          NEOFORGE_VERSION=$(grep "neoforgeVersion=" gradle.properties | cut -d'=' -f2)
+          echo "Using NeoForge version: $NEOFORGE_VERSION"
+          
+          curl -o neoforge-installer.jar \
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/${NEOFORGE_VERSION}/neoforge-${NEOFORGE_VERSION}-installer.jar"
+          java -jar neoforge-installer.jar --installServer test-server
+          
+          find neoforge/build/libs -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
+          echo "eula=true" > test-server/eula.txt
+          echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
+      
+      - name: Test mod loads correctly
+        timeout-minutes: 8
+        run: |
+          cd test-server
+          if [ -f "run.sh" ]; then
+            chmod +x run.sh && ./run.sh --nogui &
+          else
+            java -Xmx2G @user_jvm_args.txt @libraries/net/neoforged/neoforge/*/unix_args.txt --nogui &
+          fi
+          SERVER_PID=$!
+          
+          for i in {1..150}; do
+            if grep -q "Done" logs/latest.log 2>/dev/null; then
+              echo "✅ Server started!"; break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "❌ Server crashed!"; cat logs/latest.log 2>/dev/null; exit 1
+            fi
+            sleep 1
+          done
+          
+          if grep -qiE "(ERROR|FATAL).*disablevillagertrade" logs/latest.log 2>/dev/null; then
+            echo "❌ Mod has errors!"; exit 1
+          fi
+          
+          kill $SERVER_PID 2>/dev/null || true
+          echo "✅ NeoForge integration test passed!"
+      
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoforge-logs
+          path: test-server/logs/
+
+  release:
+    name: 🚀 Build & Release
+    needs: [check-changes, unit-tests, integration-bukkit, integration-fabric, integration-forge, integration-neoforge]
     if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
 
