@@ -19,14 +19,14 @@ Configurable with permission bypass and world exclusions.
 
 [[dependencies.disablevillagertrade]]
 modId = "forge"
-type = "required"
+mandatory = true
 versionRange = "[${forge_version},)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.disablevillagertrade]]
 modId = "minecraft"
-type = "required"
+mandatory = true
 versionRange = "[${minecraft_version},)"
 ordering = "NONE"
 side = "BOTH"
