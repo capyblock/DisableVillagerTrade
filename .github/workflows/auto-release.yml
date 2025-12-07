@@ -102,6 +102,12 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
 
+      - name: Sync with remote
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git pull --rebase origin master
+
       - name: Update version in pom.xml
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
@@ -129,9 +135,6 @@ jobs:
 
       - name: Commit version bump
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git pull --rebase origin master
           git add pom.xml
           git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }} [skip ci]"
           git push origin master
