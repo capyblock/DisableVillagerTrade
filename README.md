@@ -41,7 +41,7 @@ mvn clean package
 
 ## Releases
 
-This project uses automated releases via GitHub Actions. When changes are pushed or merged to the `main` branch:
+This project uses automated releases via GitHub Actions. When changes are pushed or merged to the `master` branch:
 
 1. The version is automatically bumped based on [Conventional Commits](https://www.conventionalcommits.org/)
 2. A new GitHub Release is created with the compiled JAR
