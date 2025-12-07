@@ -11,7 +11,6 @@ permissions:
 
 env:
   JAVA_VERSION: '21'
-  MINECRAFT_VERSION: '1.21.1'
 
 jobs:
   check-changes:
@@ -123,9 +122,24 @@ jobs:
       - name: Download Paper server
         run: |
           mkdir -p test-server/plugins
-          PAPER_BUILD=$(curl -s "https://api.papermc.io/v2/projects/paper/versions/${{ env.MINECRAFT_VERSION }}/builds" | jq -r '.builds[-1].build')
+          
+          # Get MC version from gradle.properties
+          MC_VERSION=$(grep "minecraftVersion=" gradle.properties | cut -d'=' -f2)
+          echo "Building for Minecraft $MC_VERSION"
+          
+          # Paper uses different version format - try to get the latest build
+          # First try exact version, then fall back to latest stable
+          PAPER_BUILD=$(curl -s "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" 2>/dev/null | jq -r '.builds[-1].build' 2>/dev/null)
+          
+          if [ -z "$PAPER_BUILD" ] || [ "$PAPER_BUILD" = "null" ]; then
+            echo "Paper $MC_VERSION not available, using latest stable version"
+            MC_VERSION=$(curl -s "https://api.papermc.io/v2/projects/paper" | jq -r '.versions[-1]')
+            PAPER_BUILD=$(curl -s "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" | jq -r '.builds[-1].build')
+          fi
+          
+          echo "Using Paper $MC_VERSION build $PAPER_BUILD"
           curl -o test-server/paper.jar \
-            "https://api.papermc.io/v2/projects/paper/versions/${{ env.MINECRAFT_VERSION }}/builds/${PAPER_BUILD}/downloads/paper-${{ env.MINECRAFT_VERSION }}-${PAPER_BUILD}.jar"
+            "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${PAPER_BUILD}/downloads/paper-${MC_VERSION}-${PAPER_BUILD}.jar"
           
           find bukkit/build/libs -name "*.jar" ! -name "*-slim.jar" -exec cp {} test-server/plugins/ \;
           echo "eula=true" > test-server/eula.txt
@@ -202,11 +216,23 @@ jobs:
       - name: Setup Fabric server
         run: |
           mkdir -p test-server/mods
-          curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
-          java -jar fabric-installer.jar server -mcversion ${{ env.MINECRAFT_VERSION }} -dir test-server -downloadMinecraft
           
-          FABRIC_API_URL=$(curl -s "https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%22${{ env.MINECRAFT_VERSION }}%22%5D&loaders=%5B%22fabric%22%5D" | jq -r '.[0].files[0].url')
-          curl -L -o test-server/mods/fabric-api.jar "$FABRIC_API_URL"
+          # Get MC version from gradle.properties
+          MC_VERSION=$(grep "minecraftVersion=" gradle.properties | cut -d'=' -f2)
+          echo "Building for Minecraft $MC_VERSION"
+          
+          curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
+          java -jar fabric-installer.jar server -mcversion $MC_VERSION -dir test-server -downloadMinecraft
+          
+          # Get Fabric API for this MC version
+          FABRIC_API_URL=$(curl -s "https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%22${MC_VERSION}%22%5D&loaders=%5B%22fabric%22%5D" | jq -r '.[0].files[0].url')
+          if [ -n "$FABRIC_API_URL" ] && [ "$FABRIC_API_URL" != "null" ]; then
+            curl -L -o test-server/mods/fabric-api.jar "$FABRIC_API_URL"
+          else
+            echo "⚠️ Could not find Fabric API for $MC_VERSION, trying latest"
+            FABRIC_API_URL=$(curl -s "https://api.modrinth.com/v2/project/fabric-api/version?loaders=%5B%22fabric%22%5D" | jq -r '.[0].files[0].url')
+            curl -L -o test-server/mods/fabric-api.jar "$FABRIC_API_URL"
+          fi
           
           find fabric/build/libs -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} test-server/mods/ \;
           echo "eula=true" > test-server/eula.txt
