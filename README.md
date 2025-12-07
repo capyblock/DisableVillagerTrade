@@ -41,29 +41,10 @@ disabled-worlds:
 ```
 
 ## Permissions
+
 | Permission | Description |
 |------------|-------------|
 | `disabletrade.bypass` | Allows the player to trade with villagers |
-
-## Building
-
-```bash
-mvn clean package
-```
-
-## Testing
-
-Run the test suite:
-
-```bash
-mvn test
-```
-
-The project uses:
-- **JUnit 5** - Testing framework
-- **Mockito** - Mocking framework
-
-Tests are automatically run on every push and pull request via GitHub Actions.
 
 ## Downloads
 
@@ -71,53 +52,6 @@ Tests are automatically run on every push and pull request via GitHub Actions.
 |----------|------|
 | GitHub Releases | [Download](https://github.com/dodoflix/DisableVillagerTrade/releases) |
 | Modrinth | [Download](https://modrinth.com/plugin/disable-villager-trade) |
-
-## Release Pipeline
-
-This project uses a simple **two-branch model**:
-
-```
-develop → master
-```
-
-### Branches
-
-| Branch | Purpose | Version | Published To |
-|--------|---------|---------|--------------|
-| `develop` | 🔧 Development builds | `1.2.3-dev.456` | GitHub (pre-release) |
-| `master` | 🚀 Stable releases | `1.2.3` | GitHub + Modrinth |
-
-### Workflow
-
-1. **Develop** on `develop` branch → automatic dev builds on GitHub
-2. **Release** by merging `develop` → `master` → stable release to GitHub + Modrinth
-
-### Version Bumping
-
-| Commit Type | Example | Version Change |
-|-------------|---------|----------------|
-| `fix:` | `fix: resolve config loading error` | 1.6.0 → 1.6.1 (Patch) |
-| `feat:` | `feat: add wandering trader support` | 1.6.0 → 1.7.0 (Minor) |
-| `feat!:` or `BREAKING CHANGE:` | `feat!: new config format` | 1.6.0 → 2.0.0 (Major) |
-
-### Release Platform Setup (For Maintainers)
-
-<details>
-<summary><b>🔧 Setup Instructions</b></summary>
-
-#### Repository Variables (Settings → Secrets and variables → Actions → Variables)
-
-| Variable | Description |
-|----------|-------------|
-| `MODRINTH_PROJECT_ID` | Your Modrinth project ID (found in project URL or settings) |
-
-#### Repository Secrets (Settings → Secrets and variables → Actions → Secrets)
-
-| Secret | How to Get |
-|--------|------------|
-| `MODRINTH_TOKEN` | [Modrinth Settings](https://modrinth.com/settings/pats) → Create PAT with `Write projects` scope |
-
-</details>
 
 ## Contributing
 
