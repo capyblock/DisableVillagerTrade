@@ -62,35 +62,23 @@ Tests are automatically run on every push and pull request via GitHub Actions.
 
 ## Release Pipeline
 
-This project uses a **three-stage release pipeline** with automated deployments:
+This project uses a simple **two-branch model**:
 
 ```
-develop → pre-release → master (production)
+develop → master
 ```
 
-### Branches & Release Types
+### Branches
 
-| Branch | Release Type | Version Format | Published To |
-|--------|--------------|----------------|--------------|
-| `develop` | 🔧 Development | `1.2.3-SNAPSHOT.123` | GitHub only |
-| `pre-release` | 🧪 Pre-Release (RC) | `1.2.3-RC.123` | GitHub + Modrinth (beta) |
-| `master` | 🚀 Production | `1.2.3` | GitHub + Modrinth (release) |
+| Branch | Purpose | Version | Published To |
+|--------|---------|---------|--------------|
+| `develop` | 🔧 Development builds | `1.2.3-dev.456` | GitHub (pre-release) |
+| `master` | 🚀 Stable releases | `1.2.3` | GitHub + Modrinth |
 
-### Development Workflow
+### Workflow
 
-1. **Development**: Work on `develop` branch
-   - Automatic snapshot releases for testing
-   - Not published to Modrinth
-
-2. **Pre-Release**: Merge `develop` → `pre-release`
-   - Creates Release Candidate (RC) version
-   - Published to Modrinth as **beta**
-   - Test on staging servers
-
-3. **Production**: Merge `pre-release` → `master`
-   - Creates stable production release
-   - Published to Modrinth as **release**
-   - Version bumped permanently
+1. **Develop** on `develop` branch → automatic dev builds on GitHub
+2. **Release** by merging `develop` → `master` → stable release to GitHub + Modrinth
 
 ### Version Bumping
 

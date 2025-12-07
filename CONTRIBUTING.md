@@ -12,10 +12,8 @@ Thank you for your interest in contributing to DisableVillagerTrade! This docume
 
 ## Branch Strategy
 
-This project uses a three-stage release pipeline:
-
 ```
-develop → pre-release → master
+develop → master
    ↑
  Your PR
 ```
@@ -23,8 +21,7 @@ develop → pre-release → master
 | Branch | Purpose |
 |--------|---------|
 | `develop` | Active development, submit PRs here |
-| `pre-release` | Release candidates for testing |
-| `master` | Production releases only |
+| `master` | Stable production releases |
 
 **Always create PRs targeting `develop`**, not `master`.
 
