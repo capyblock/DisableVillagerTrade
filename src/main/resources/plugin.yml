@@ -7,7 +7,16 @@ authors:
 description: A lightweight plugin to prevent players from trading with villagers.
 website: https://github.com/dodoflix/DisableVillagerTrade
 
+commands:
+  disabletrade:
+    description: Main command for DisableVillagerTrade plugin
+    usage: /<command> <reload|status|toggle|help>
+    aliases: [dvt, tradetoggle]
+
 permissions:
+  disabletrade.admin:
+    description: Allows access to all DisableVillagerTrade admin commands.
+    default: op
   disabletrade.bypass:
     description: Allows the player to bypass the trade block and trade with villagers.
     default: op

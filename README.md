@@ -19,6 +19,8 @@ Disable villager trade on your minecraft spigot based server!
 - Bypass permission (`disabletrade.bypass`) for staff
 - Per-world disable configuration
 - Villagers with no profession (NONE) can still be interacted with
+- Automatic update checker with notifications
+- Admin commands for management
 
 ## Installation
 1. Download the latest release
@@ -41,11 +43,24 @@ disabled-worlds:
   - example-world
 ```
 
+## Commands
+
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/disabletrade reload` | Reload the plugin configuration | `disabletrade.admin` |
+| `/disabletrade status` | Show plugin status and settings | `disabletrade.admin` |
+| `/disabletrade toggle [player]` | Check bypass permission status | `disabletrade.admin` |
+| `/disabletrade help` | Show help message | `disabletrade.admin` |
+
+**Aliases:** `/dvt`, `/tradetoggle`
+
 ## Permissions
 
-| Permission | Description |
-|------------|-------------|
-| `disabletrade.bypass` | Allows the player to trade with villagers |
+| Permission | Description | Default |
+|------------|-------------|---------|
+| `disabletrade.admin` | Access to all admin commands | OP |
+| `disabletrade.bypass` | Allows the player to bypass trade block | OP |
+| `disabletrade.update` | Receives update notifications on join | OP |
 
 ## Downloads
 
