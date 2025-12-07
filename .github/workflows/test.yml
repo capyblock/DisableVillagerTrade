@@ -13,15 +13,66 @@ on:
       - develop
 
 jobs:
+  check-changes:
+    name: Check for Code Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_test: ${{ steps.changes.outputs.should_test }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check for code file changes
+        id: changes
+        run: |
+          # Get changed files
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check if any testable files changed
+          SHOULD_TEST="false"
+          
+          while IFS= read -r file; do
+            # Source files and tests
+            if [[ "$file" == src/main/java/* ]] || \
+               [[ "$file" == src/main/resources/* ]] || \
+               [[ "$file" == src/test/* ]] || \
+               [[ "$file" == "pom.xml" ]]; then
+              SHOULD_TEST="true"
+              echo "✅ Code file changed: $file"
+              break
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          # Force test with [force ci] in commit message
+          COMMIT_MSG="${{ github.event.head_commit.message || github.event.pull_request.title }}"
+          if [[ "$COMMIT_MSG" == *"[force ci]"* ]]; then
+            SHOULD_TEST="true"
+            echo "✅ Force CI requested"
+          fi
+          
+          # Skip if [skip ci] in commit message
+          if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]]; then
+            SHOULD_TEST="false"
+            echo "⏭️ Skipping due to [skip ci]"
+          fi
+          
+          echo "should_test=$SHOULD_TEST" >> $GITHUB_OUTPUT
+          echo "Should test: $SHOULD_TEST"
+
   test:
     name: Unit Tests & Coverage
+    needs: check-changes
+    if: needs.check-changes.outputs.should_test == 'true'
     runs-on: ubuntu-latest
-    # Skip for docs-only commits (docs:, style:, chore: without code changes)
-    if: |
-      !startsWith(github.event.head_commit.message, 'docs:') &&
-      !startsWith(github.event.head_commit.message, 'docs(') &&
-      !contains(github.event.head_commit.message, '[skip ci]') &&
-      !contains(github.event.head_commit.message, '[ci skip]')
     
     steps:
       - name: Checkout repository
@@ -117,13 +168,9 @@ jobs:
 
   code-analysis:
     name: Code Analysis
+    needs: check-changes
+    if: needs.check-changes.outputs.should_test == 'true'
     runs-on: ubuntu-latest
-    # Skip for docs-only commits
-    if: |
-      !startsWith(github.event.head_commit.message, 'docs:') &&
-      !startsWith(github.event.head_commit.message, 'docs(') &&
-      !contains(github.event.head_commit.message, '[skip ci]') &&
-      !contains(github.event.head_commit.message, '[ci skip]')
     
     steps:
       - name: Checkout repository

@@ -13,13 +13,59 @@ env:
   JAVA_VERSION: '21'
 
 jobs:
+  check-changes:
+    name: Check for Plugin Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.changes.outputs.should_deploy }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check for plugin file changes
+        id: changes
+        run: |
+          # Get changed files between HEAD and previous commit
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD)
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check if any plugin source files changed
+          SHOULD_DEPLOY="false"
+          
+          while IFS= read -r file; do
+            # Plugin source files
+            if [[ "$file" == src/main/java/* ]] || \
+               [[ "$file" == src/main/resources/* ]] || \
+               [[ "$file" == "pom.xml" ]]; then
+              SHOULD_DEPLOY="true"
+              echo "✅ Plugin file changed: $file"
+              break
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          # Also check commit message for force deploy
+          if [[ "${{ github.event.head_commit.message }}" == *"[force deploy]"* ]]; then
+            SHOULD_DEPLOY="true"
+            echo "✅ Force deploy requested via commit message"
+          fi
+          
+          # Skip if [skip ci] in commit message
+          if [[ "${{ github.event.head_commit.message }}" == *"[skip ci]"* ]]; then
+            SHOULD_DEPLOY="false"
+            echo "⏭️ Skipping due to [skip ci] in commit message"
+          fi
+          
+          echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          echo "Should deploy: $SHOULD_DEPLOY"
+
   code-analysis:
     name: Code Analysis
-    # Skip for docs-only commits or [skip ci]
-    if: |
-      !startsWith(github.event.head_commit.message, 'docs:') &&
-      !startsWith(github.event.head_commit.message, 'docs(') &&
-      !contains(github.event.head_commit.message, '[skip ci]')
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -50,12 +96,8 @@ jobs:
 
   release:
     name: Build & Release
-    needs: code-analysis
-    # Skip for docs-only commits or [skip ci]
-    if: |
-      !startsWith(github.event.head_commit.message, 'docs:') &&
-      !startsWith(github.event.head_commit.message, 'docs(') &&
-      !contains(github.event.head_commit.message, '[skip ci]')
+    needs: [check-changes, code-analysis]
+    if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
 
     steps:
