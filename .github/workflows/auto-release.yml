@@ -20,24 +20,21 @@ jobs:
       should_deploy: ${{ steps.changes.outputs.should_deploy }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
       - name: Check for plugin file changes
         id: changes
         run: |
-          # Get changed files between HEAD and previous commit
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD)
           
           echo "Changed files:"
           echo "$CHANGED_FILES"
           
-          # Check if any plugin source files changed
           SHOULD_DEPLOY="false"
           
           while IFS= read -r file; do
-            # Plugin source files (multi-module structure)
             if [[ "$file" == */src/main/java/* ]] || \
                [[ "$file" == */src/main/resources/* ]] || \
                [[ "$file" == common/* ]] || \
@@ -55,13 +52,11 @@ jobs:
             fi
           done <<< "$CHANGED_FILES"
           
-          # Also check commit message for force deploy
           if [[ "${{ github.event.head_commit.message }}" == *"[force deploy]"* ]]; then
             SHOULD_DEPLOY="true"
             echo "✅ Force deploy requested via commit message"
           fi
           
-          # Skip if [skip ci] in commit message
           if [[ "${{ github.event.head_commit.message }}" == *"[skip ci]"* ]]; then
             SHOULD_DEPLOY="false"
             echo "⏭️ Skipping due to [skip ci] in commit message"
@@ -70,9 +65,9 @@ jobs:
           echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
           echo "Should deploy: $SHOULD_DEPLOY"
 
-  # Run unit tests
-  unit-tests:
-    name: 🧪 Unit Tests
+  # Build everything once
+  build:
+    name: 🔨 Build All Platforms
     needs: check-changes
     if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
@@ -87,21 +82,58 @@ jobs:
           distribution: 'temurin'
           cache: gradle
       
+      - name: Grant execute permission
+        run: chmod +x gradlew
+      
       - name: Run unit tests
         run: ./gradlew test --no-daemon
       
-      - name: Upload test results
+      - name: Build all platforms
+        run: ./gradlew build --no-daemon
+      
+      - name: Upload Bukkit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bukkit-jar
+          path: bukkit/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 1
+      
+      - name: Upload Fabric artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fabric-jar
+          path: fabric/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 1
+      
+      - name: Upload Forge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-jar
+          path: forge/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 1
+      
+      - name: Upload NeoForge artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoforge-jar
+          path: neoforge/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 1
+      
+      - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-results
+          name: test-results
           path: '**/build/reports/tests/'
 
   # Integration test - Bukkit/Paper
   integration-bukkit:
     name: 🪣 Integration Test (Paper)
-    needs: [check-changes, unit-tests]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -114,21 +146,20 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build plugin
-        run: ./gradlew :bukkit:shadowJar --no-daemon
+      - name: Download Bukkit artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bukkit-jar
+          path: bukkit-build
       
       - name: Download Paper server
         run: |
           mkdir -p test-server/plugins
           
-          # Get MC version from gradle.properties
-          MC_VERSION=$(grep "minecraftVersion=" gradle.properties | cut -d'=' -f2)
+          MC_VERSION=$(grep "^minecraftVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Building for Minecraft $MC_VERSION"
           
-          # Paper uses different version format - try to get the latest build
-          # First try exact version, then fall back to latest stable
           PAPER_BUILD=$(curl -s "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds" 2>/dev/null | jq -r '.builds[-1].build' 2>/dev/null)
           
           if [ -z "$PAPER_BUILD" ] || [ "$PAPER_BUILD" = "null" ]; then
@@ -141,7 +172,8 @@ jobs:
           curl -o test-server/paper.jar \
             "https://api.papermc.io/v2/projects/paper/versions/${MC_VERSION}/builds/${PAPER_BUILD}/downloads/paper-${MC_VERSION}-${PAPER_BUILD}.jar"
           
-          find bukkit/build/libs -name "*.jar" ! -name "*-slim.jar" -exec cp {} test-server/plugins/ \;
+          # Copy built JAR (exclude slim)
+          find bukkit-build -name "*.jar" ! -name "*-slim.jar" -exec cp {} test-server/plugins/ \;
           echo "eula=true" > test-server/eula.txt
           echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
@@ -163,7 +195,6 @@ jobs:
             sleep 1
           done
           
-          # Check if plugin was initialized (Paper shows it in plugin list)
           if grep -qi "DisableVillagerTrade" logs/latest.log; then
             echo "✅ Plugin loaded successfully!"
             grep -i "DisableVillagerTrade" logs/latest.log | head -5
@@ -171,12 +202,10 @@ jobs:
             echo "❌ Plugin failed to load!"; cat logs/latest.log; exit 1
           fi
           
-          # Check for plugin-specific errors
           if grep -qiE "(ERROR|SEVERE).*DisableVillagerTrade" logs/latest.log; then
             echo "❌ Plugin has errors!"; grep -iE "(ERROR|SEVERE)" logs/latest.log; exit 1
           fi
           
-          # Check for failed to load messages
           if grep -qi "Could not load.*DisableVillagerTrade\|failed to load.*DisableVillagerTrade" logs/latest.log; then
             echo "❌ Plugin failed to load!"; grep -i "DisableVillagerTrade" logs/latest.log; exit 1
           fi
@@ -194,8 +223,7 @@ jobs:
   # Integration test - Fabric
   integration-fabric:
     name: 🧵 Integration Test (Fabric)
-    needs: [check-changes, unit-tests]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -208,33 +236,29 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build mod
-        run: ./gradlew :fabric:build --no-daemon
+      - name: Download Fabric artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fabric-jar
+          path: fabric-build
       
       - name: Setup Fabric server
         run: |
           mkdir -p test-server/mods
           
-          # Get MC version from gradle.properties
-          MC_VERSION=$(grep "minecraftVersion=" gradle.properties | cut -d'=' -f2)
+          MC_VERSION=$(grep "^minecraftVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Building for Minecraft $MC_VERSION"
           
           curl -o fabric-installer.jar "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar"
           java -jar fabric-installer.jar server -mcversion $MC_VERSION -dir test-server -downloadMinecraft
           
-          # Get Fabric API for this MC version
           FABRIC_API_URL=$(curl -s "https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%22${MC_VERSION}%22%5D&loaders=%5B%22fabric%22%5D" | jq -r '.[0].files[0].url')
           if [ -n "$FABRIC_API_URL" ] && [ "$FABRIC_API_URL" != "null" ]; then
             curl -L -o test-server/mods/fabric-api.jar "$FABRIC_API_URL"
-          else
-            echo "⚠️ Could not find Fabric API for $MC_VERSION, trying latest"
-            FABRIC_API_URL=$(curl -s "https://api.modrinth.com/v2/project/fabric-api/version?loaders=%5B%22fabric%22%5D" | jq -r '.[0].files[0].url')
-            curl -L -o test-server/mods/fabric-api.jar "$FABRIC_API_URL"
           fi
           
-          find fabric/build/libs -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} test-server/mods/ \;
+          find fabric-build -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} test-server/mods/ \;
           echo "eula=true" > test-server/eula.txt
           echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
@@ -272,8 +296,7 @@ jobs:
   # Integration test - Forge
   integration-forge:
     name: 🔥 Integration Test (Forge)
-    needs: [check-changes, unit-tests]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -286,10 +309,12 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build mod
-        run: ./gradlew :forge:build --no-daemon
+      - name: Download Forge artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-jar
+          path: forge-build
       
       - name: Setup Forge server
         run: |
@@ -297,16 +322,13 @@ jobs:
           FORGE_VERSION=$(grep "^forgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Using Forge version: $FORGE_VERSION"
           
-          # Download Forge installer
           FORGE_URL="https://maven.minecraftforge.net/net/minecraftforge/forge/${FORGE_VERSION}/forge-${FORGE_VERSION}-installer.jar"
           echo "Downloading from: $FORGE_URL"
           curl -f -o forge-installer.jar "$FORGE_URL"
           
-          # Install server
           java -jar forge-installer.jar --installServer test-server
           
-          # Copy mod
-          find forge/build/libs -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
+          find forge-build -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
           echo "eula=true" > test-server/eula.txt
           echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
@@ -315,15 +337,12 @@ jobs:
         run: |
           cd test-server
           
-          # Find and run the server
           if [ -f "run.sh" ]; then
             chmod +x run.sh && ./run.sh --nogui &
           elif [ -f "run.bat" ]; then
-            # Extract java command from run.bat for Linux
             JAVA_ARGS=$(grep "java" run.bat | sed 's/.*java/java/' | sed 's/%\*//g')
             eval "$JAVA_ARGS --nogui" &
           else
-            # Try to find forge server jar
             FORGE_JAR=$(find . -maxdepth 1 -name "forge-*.jar" ! -name "*installer*" | head -1)
             if [ -n "$FORGE_JAR" ]; then
               java -Xmx2G -jar "$FORGE_JAR" --nogui &
@@ -345,7 +364,6 @@ jobs:
             sleep 1
           done
           
-          # Check for mod errors
           if grep -qiE "(ERROR|FATAL).*disablevillagertrade" logs/latest.log 2>/dev/null; then
             echo "❌ Mod has errors!"
             grep -iE "(ERROR|FATAL)" logs/latest.log
@@ -365,8 +383,7 @@ jobs:
   # Integration test - NeoForge
   integration-neoforge:
     name: ⚒️ Integration Test (NeoForge)
-    needs: [check-changes, unit-tests]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -379,10 +396,12 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: gradle
       
-      - name: Build mod
-        run: ./gradlew :neoforge:build --no-daemon
+      - name: Download NeoForge artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: neoforge-jar
+          path: neoforge-build
       
       - name: Setup NeoForge server
         run: |
@@ -395,7 +414,7 @@ jobs:
           curl -f -o neoforge-installer.jar "$NEOFORGE_URL"
           java -jar neoforge-installer.jar --installServer test-server
           
-          find neoforge/build/libs -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
+          find neoforge-build -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -exec cp {} test-server/mods/ \;
           echo "eula=true" > test-server/eula.txt
           echo -e "online-mode=false\nspawn-protection=0\nmax-tick-time=-1" > test-server/server.properties
       
@@ -434,28 +453,24 @@ jobs:
           name: neoforge-logs
           path: test-server/logs/
 
+  # Release job - uses pre-built artifacts
   release:
-    name: 🚀 Build & Release
-    needs: [check-changes, unit-tests, integration-bukkit, integration-fabric, integration-forge, integration-neoforge]
+    name: 🚀 Release
+    needs: [check-changes, build, integration-bukkit, integration-fabric, integration-forge, integration-neoforge]
     if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up JDK
-        uses: actions/setup-java@v5
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+          path: artifacts
 
       - name: Determine release type
         id: release_type
@@ -465,29 +480,23 @@ jobs:
           
           if [ "$BRANCH" = "master" ]; then
             echo "is_production=true" >> $GITHUB_OUTPUT
-            echo "suffix=" >> $GITHUB_OUTPUT
             echo "📦 Production Release"
           else
             echo "is_production=false" >> $GITHUB_OUTPUT
-            echo "suffix=-dev" >> $GITHUB_OUTPUT
             echo "🔧 Development Build"
           fi
 
       - name: Get current version
         id: current_version
         run: |
-          # Try modVersion first, then mod_version as fallback
-          VERSION=$(grep "^modVersion=" gradle.properties | cut -d'=' -f2)
+          VERSION=$(grep "^modVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           if [ -z "$VERSION" ]; then
-            VERSION=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
+            VERSION=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           fi
-          # Remove any existing suffix
           VERSION=$(echo "$VERSION" | sed 's/-dev.*//g' | sed 's/-SNAPSHOT//g')
           
-          # Fallback if still empty
           if [ -z "$VERSION" ]; then
-            echo "⚠️ Could not read version from gradle.properties, using 1.12.0 as fallback"
-            VERSION="1.12.0"
+            VERSION="1.15.0"
           fi
           
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -496,19 +505,13 @@ jobs:
       - name: Determine version bump from commits
         id: bump
         run: |
-          # Get commits since last production tag
           LAST_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | grep -v "dev" | head -n1 || echo "")
           
           if [ -z "$LAST_TAG" ]; then
-            echo "No previous tag found, analyzing all commits"
             COMMITS=$(git log --pretty=format:"%s" --no-merges)
           else
-            echo "Last production tag: $LAST_TAG"
             COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s" --no-merges)
           fi
-          
-          echo "Commits to analyze:"
-          echo "$COMMITS"
           
           BUMP_TYPE="patch"
           
@@ -519,7 +522,6 @@ jobs:
           fi
           
           echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-          echo "Determined bump type: $BUMP_TYPE"
 
       - name: Calculate new version
         id: new_version
@@ -529,63 +531,25 @@ jobs:
           IS_PRODUCTION="${{ steps.release_type.outputs.is_production }}"
           
           if [ "$IS_PRODUCTION" = "true" ]; then
-            # Only bump version on production releases
             IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
             MAJOR=${VERSION_PARTS[0]:-0}
             MINOR=${VERSION_PARTS[1]:-0}
             PATCH=${VERSION_PARTS[2]:-0}
             
             case $BUMP_TYPE in
-              major)
-                MAJOR=$((MAJOR + 1))
-                MINOR=0
-                PATCH=0
-                ;;
-              minor)
-                MINOR=$((MINOR + 1))
-                PATCH=0
-                ;;
-              patch)
-                PATCH=$((PATCH + 1))
-                ;;
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
             esac
             
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            BASE_VERSION="$NEW_VERSION"
           else
-            # Dev builds use current version with -dev suffix (no bump)
             COMMIT_COUNT=$(git rev-list --count HEAD)
             NEW_VERSION="${CURRENT}-dev.${COMMIT_COUNT}"
-            BASE_VERSION="$CURRENT"
           fi
           
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
-
-      - name: Sync with remote
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git pull --rebase origin ${{ steps.release_type.outputs.branch }}
-
-      - name: Update version in gradle.properties
-        run: |
-          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
-          # Update modVersion (or mod_version if that's used)
-          if grep -q "^modVersion=" gradle.properties; then
-            sed -i "s/^modVersion=.*/modVersion=$NEW_VERSION/" gradle.properties
-          else
-            sed -i "s/^mod_version=.*/mod_version=$NEW_VERSION/" gradle.properties
-          fi
-          echo "Updated gradle.properties to version $NEW_VERSION"
-          cat gradle.properties | grep -E "^mod[Vv]ersion="
-
-      - name: Build all platforms
-        run: |
-          echo "🏗️ Building all platforms..."
-          ./gradlew build --no-daemon
-          echo "✅ All platforms built!"
 
       - name: Generate changelog
         id: changelog
@@ -632,79 +596,61 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
-      # Only commit version bump for production releases
-      - name: Commit version bump
-        if: steps.release_type.outputs.is_production == 'true'
-        run: |
-          git add gradle.properties
-          git commit -m "chore: release v${{ steps.new_version.outputs.new_version }} [skip ci]"
-          git push origin master
-
-      - name: Collect artifacts
-        id: artifacts
+      - name: Collect release artifacts
         run: |
           VERSION="${{ steps.new_version.outputs.new_version }}"
           mkdir -p release-artifacts
           
           echo "📦 Collecting artifacts for version ${VERSION}..."
-          echo ""
           
-          # Debug: Show what's in each build/libs directory
-          echo "=== Bukkit build/libs ==="
-          ls -la bukkit/build/libs/ 2>/dev/null || echo "No bukkit/build/libs directory"
-          echo ""
-          
-          echo "=== Fabric build/libs ==="
-          ls -la fabric/build/libs/ 2>/dev/null || echo "No fabric/build/libs directory"
-          echo ""
-          
-          echo "=== Forge build/libs ==="
-          ls -la forge/build/libs/ 2>/dev/null || echo "No forge/build/libs directory"
-          echo ""
-          
-          echo "=== NeoForge build/libs ==="
-          ls -la neoforge/build/libs/ 2>/dev/null || echo "No neoforge/build/libs directory"
-          echo ""
-          
-          # Find and copy Bukkit artifact (exclude sources and slim jars)
-          BUKKIT_JAR=$(find bukkit/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          # Bukkit
+          BUKKIT_JAR=$(find artifacts/bukkit-jar -name "*.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
           if [ -n "$BUKKIT_JAR" ]; then
             cp "$BUKKIT_JAR" "release-artifacts/DisableVillagerTrade-Bukkit-${VERSION}.jar"
             echo "✅ Bukkit: $BUKKIT_JAR"
-          else
-            echo "⚠️ Bukkit: No JAR found"
           fi
           
-          # Find and copy Fabric artifact (not dev or sources)
-          FABRIC_JAR=$(find fabric/build/libs -maxdepth 1 -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -type f 2>/dev/null | head -1)
+          # Fabric
+          FABRIC_JAR=$(find artifacts/fabric-jar -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -type f 2>/dev/null | head -1)
           if [ -n "$FABRIC_JAR" ]; then
             cp "$FABRIC_JAR" "release-artifacts/DisableVillagerTrade-Fabric-${VERSION}.jar"
             echo "✅ Fabric: $FABRIC_JAR"
-          else
-            echo "⚠️ Fabric: No JAR found"
           fi
           
-          # Find and copy Forge artifact (exclude sources and slim jars)
-          FORGE_JAR=$(find forge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          # Forge
+          FORGE_JAR=$(find artifacts/forge-jar -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
           if [ -n "$FORGE_JAR" ]; then
             cp "$FORGE_JAR" "release-artifacts/DisableVillagerTrade-Forge-${VERSION}.jar"
             echo "✅ Forge: $FORGE_JAR"
-          else
-            echo "⚠️ Forge: No JAR found"
           fi
           
-          # Find and copy NeoForge artifact (exclude sources and slim jars)
-          NEOFORGE_JAR=$(find neoforge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          # NeoForge
+          NEOFORGE_JAR=$(find artifacts/neoforge-jar -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
           if [ -n "$NEOFORGE_JAR" ]; then
             cp "$NEOFORGE_JAR" "release-artifacts/DisableVillagerTrade-NeoForge-${VERSION}.jar"
             echo "✅ NeoForge: $NEOFORGE_JAR"
-          else
-            echo "⚠️ NeoForge: No JAR found"
           fi
           
           echo ""
           echo "=== Final release artifacts ==="
           ls -la release-artifacts/
+
+      - name: Update version and commit (production only)
+        if: steps.release_type.outputs.is_production == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+          if grep -q "^modVersion=" gradle.properties; then
+            sed -i "s/^modVersion=.*/modVersion=$NEW_VERSION/" gradle.properties
+          else
+            sed -i "s/^mod_version=.*/mod_version=$NEW_VERSION/" gradle.properties
+          fi
+          
+          git add gradle.properties
+          git commit -m "chore: release v${NEW_VERSION} [skip ci]"
+          git push origin master
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -712,7 +658,7 @@ jobs:
           tag_name: v${{ steps.new_version.outputs.new_version }}
           name: "${{ steps.release_type.outputs.is_production == 'true' && '🚀' || '🔧' }} DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}"
           body: |
-            ${{ steps.release_type.outputs.is_production == 'true' && '> **Stable Release**' || '> **Development Build** - For testing only, may be unstable' }} - ${{ steps.changelog.outputs.summary }}
+            ${{ steps.release_type.outputs.is_production == 'true' && '> **Stable Release**' || '> **Development Build** - For testing only' }} - ${{ steps.changelog.outputs.summary }}
             
             ## What's Changed
             
@@ -722,23 +668,16 @@ jobs:
             
             | Platform | File | Minecraft Version |
             |----------|------|-------------------|
-            | **Bukkit/Spigot/Paper** | `DisableVillagerTrade-Bukkit-${{ steps.new_version.outputs.new_version }}.jar` | 1.14 - 1.21.10+ |
+            | **Bukkit/Spigot/Paper** | `DisableVillagerTrade-Bukkit-${{ steps.new_version.outputs.new_version }}.jar` | 1.14+ |
             | **Fabric** | `DisableVillagerTrade-Fabric-${{ steps.new_version.outputs.new_version }}.jar` | 1.21.10 |
             | **Forge** | `DisableVillagerTrade-Forge-${{ steps.new_version.outputs.new_version }}.jar` | 1.21.10 |
             | **NeoForge** | `DisableVillagerTrade-NeoForge-${{ steps.new_version.outputs.new_version }}.jar` | 1.21.10 |
-            | **Quilt** | Use Fabric version | 1.21.10 |
-            
-            ## 📋 Requirements
-            
-            - **Java**: 21+
-            - **Fabric**: Requires [Fabric API](https://modrinth.com/mod/fabric-api)
           files: release-artifacts/*.jar
           draft: false
           prerelease: ${{ steps.release_type.outputs.is_production != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Only publish to Modrinth for production releases
       - name: Publish Bukkit to Modrinth
         if: steps.release_type.outputs.is_production == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
@@ -746,62 +685,19 @@ jobs:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: release-artifacts/DisableVillagerTrade-Bukkit-${{ steps.new_version.outputs.new_version }}.jar
-          name: v${{ steps.new_version.outputs.new_version }} (Bukkit) - ${{ steps.changelog.outputs.summary }}
+          name: v${{ steps.new_version.outputs.new_version }} (Bukkit)
           version: ${{ steps.new_version.outputs.new_version }}-bukkit
           version-type: release
-          loaders: |
-            spigot
-            paper
-            purpur
-            bukkit
+          loaders: spigot, paper, purpur, bukkit
           game-versions: |
-            1.14
-            1.14.1
-            1.14.2
-            1.14.3
-            1.14.4
-            1.15
-            1.15.1
-            1.15.2
-            1.16
-            1.16.1
-            1.16.2
-            1.16.3
-            1.16.4
-            1.16.5
-            1.17
-            1.17.1
-            1.18
-            1.18.1
-            1.18.2
-            1.19
-            1.19.1
-            1.19.2
-            1.19.3
-            1.19.4
-            1.20
-            1.20.1
-            1.20.2
-            1.20.3
-            1.20.4
-            1.20.5
-            1.20.6
-            1.21
-            1.21.1
-            1.21.2
-            1.21.3
-            1.21.4
-            1.21.5
-            1.21.6
-            1.21.7
-            1.21.8
-            1.21.9
-            1.21.10
-          changelog: |
-            ## What's New
-            ${{ steps.changelog.outputs.changelog }}
-            
-            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+            1.14, 1.14.1, 1.14.2, 1.14.3, 1.14.4
+            1.15, 1.15.1, 1.15.2
+            1.16, 1.16.1, 1.16.2, 1.16.3, 1.16.4, 1.16.5
+            1.17, 1.17.1
+            1.18, 1.18.1, 1.18.2
+            1.19, 1.19.1, 1.19.2, 1.19.3, 1.19.4
+            1.20, 1.20.1, 1.20.2, 1.20.3, 1.20.4, 1.20.5, 1.20.6
+            1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4
         continue-on-error: true
 
       - name: Publish Fabric to Modrinth
@@ -811,21 +707,12 @@ jobs:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: release-artifacts/DisableVillagerTrade-Fabric-${{ steps.new_version.outputs.new_version }}.jar
-          name: v${{ steps.new_version.outputs.new_version }} (Fabric) - ${{ steps.changelog.outputs.summary }}
+          name: v${{ steps.new_version.outputs.new_version }} (Fabric)
           version: ${{ steps.new_version.outputs.new_version }}-fabric
           version-type: release
-          loaders: |
-            fabric
-            quilt
-          game-versions: |
-            1.21.10
-          dependencies: |
-            fabric-api | depends
-          changelog: |
-            ## What's New
-            ${{ steps.changelog.outputs.changelog }}
-            
-            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+          loaders: fabric, quilt
+          game-versions: 1.21.10
+          dependencies: fabric-api | depends
         continue-on-error: true
 
       - name: Publish Forge to Modrinth
@@ -835,18 +722,11 @@ jobs:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: release-artifacts/DisableVillagerTrade-Forge-${{ steps.new_version.outputs.new_version }}.jar
-          name: v${{ steps.new_version.outputs.new_version }} (Forge) - ${{ steps.changelog.outputs.summary }}
+          name: v${{ steps.new_version.outputs.new_version }} (Forge)
           version: ${{ steps.new_version.outputs.new_version }}-forge
           version-type: release
-          loaders: |
-            forge
-          game-versions: |
-            1.21.10
-          changelog: |
-            ## What's New
-            ${{ steps.changelog.outputs.changelog }}
-            
-            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+          loaders: forge
+          game-versions: 1.21.10
         continue-on-error: true
 
       - name: Publish NeoForge to Modrinth
@@ -856,29 +736,9 @@ jobs:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: release-artifacts/DisableVillagerTrade-NeoForge-${{ steps.new_version.outputs.new_version }}.jar
-          name: v${{ steps.new_version.outputs.new_version }} (NeoForge) - ${{ steps.changelog.outputs.summary }}
+          name: v${{ steps.new_version.outputs.new_version }} (NeoForge)
           version: ${{ steps.new_version.outputs.new_version }}-neoforge
           version-type: release
-          loaders: |
-            neoforge
-          game-versions: |
-            1.21.10
-          changelog: |
-            ## What's New
-            ${{ steps.changelog.outputs.changelog }}
-            
-            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
-        continue-on-error: true
-
-      - name: Update Modrinth Description
-        if: steps.release_type.outputs.is_production == 'true' && vars.MODRINTH_PROJECT_ID != ''
-        run: |
-          DESCRIPTION=$(cat .modrinth/description.md)
-          SUMMARY=$(tr -d '\n' < .modrinth/summary.txt | head -c 255)
-          
-          curl -s -X PATCH "https://api.modrinth.com/v2/project/${{ vars.MODRINTH_PROJECT_ID }}" \
-            -H "Authorization: ${{ secrets.MODRINTH_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg body "$DESCRIPTION" --arg summary "$SUMMARY" '{body: $body, summary: $summary}')" \
-            && echo "✅ Updated Modrinth description" || echo "⚠️ Failed to update description"
+          loaders: neoforge
+          game-versions: 1.21.10
         continue-on-error: true
