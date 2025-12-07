@@ -45,7 +45,7 @@ public final class DisableVillagerTrade extends JavaPlugin {
             // Register update notification listener if notify-on-join is enabled
             if (pluginConfig.isNotifyOnJoin()) {
                 getServer().getPluginManager().registerEvents(
-                    new UpdateNotifyListener(updateChecker, pluginConfig), this);
+                    new UpdateNotifyListener(this, updateChecker, pluginConfig), this);
             }
         }
         

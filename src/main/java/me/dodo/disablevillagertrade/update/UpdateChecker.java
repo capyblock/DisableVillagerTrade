@@ -32,6 +32,8 @@ public class UpdateChecker {
      * Creates a new update checker.
      * @param plugin the plugin instance
      */
+    @SuppressFBWarnings(value = "EI_EXPOSE_REP2", 
+        justification = "Plugin reference is intentionally stored for Bukkit API access")
     public UpdateChecker(JavaPlugin plugin) {
         this.plugin = plugin;
         this.latestVersion = null;
@@ -92,8 +94,6 @@ public class UpdateChecker {
      * Fetches the latest version from the Modrinth API.
      * @return the API response as a string, or null if failed
      */
-    @SuppressFBWarnings(value = "URLCONNECTION_SSRF_FD", 
-        justification = "URL is hardcoded constant, not user input")
     private String fetchLatestVersion() {
         HttpURLConnection connection = null;
         try {
