@@ -1,6 +1,9 @@
 # DisableVillagerTrade Configuration
 # https://github.com/capyblock/DisableVillagerTrade
 
+# DO NOT CHANGE - Used for automatic config migration
+config-version: 2
+
 # Message settings
 message:
   # Whether to show a message when trading is blocked
