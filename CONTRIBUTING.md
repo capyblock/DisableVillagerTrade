@@ -156,6 +156,43 @@ When reporting bugs, please include:
 - Expected vs actual behavior
 - Relevant console logs/errors
 
+## Release Pipeline (For Maintainers)
+
+This project uses a **two-branch model** with automatic releases:
+
+```
+develop → master
+```
+
+| Branch | Purpose | Version | Published To |
+|--------|---------|---------|--------------|
+| `develop` | 🔧 Development builds | `1.2.3-dev.456` | GitHub (pre-release) |
+| `master` | 🚀 Stable releases | `1.2.3` | GitHub + Modrinth |
+
+### Release Workflow
+
+1. **Develop** on `develop` branch → automatic dev builds on GitHub
+2. **Release** by merging `develop` → `master` → stable release to GitHub + Modrinth
+
+### Release Platform Setup
+
+<details>
+<summary><b>🔧 Setup Instructions</b></summary>
+
+#### Repository Variables (Settings → Secrets and variables → Actions → Variables)
+
+| Variable | Description |
+|----------|-------------|
+| `MODRINTH_PROJECT_ID` | Your Modrinth project ID (found in project URL or settings) |
+
+#### Repository Secrets (Settings → Secrets and variables → Actions → Secrets)
+
+| Secret | How to Get |
+|--------|------------|
+| `MODRINTH_TOKEN` | [Modrinth Settings](https://modrinth.com/settings/pats) → Create PAT with `Write projects` scope |
+
+</details>
+
 ## Questions?
 
 Feel free to open an issue for any questions about contributing.
