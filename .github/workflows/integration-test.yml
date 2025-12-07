@@ -264,7 +264,7 @@ jobs:
       - name: Download Forge server
         run: |
           mkdir -p test-server/mods
-          FORGE_VERSION=$(grep "forgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          FORGE_VERSION=$(grep "^forgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Using Forge version: $FORGE_VERSION"
           
           FORGE_URL="https://maven.minecraftforge.net/net/minecraftforge/forge/${FORGE_VERSION}/forge-${FORGE_VERSION}-installer.jar"
@@ -343,7 +343,7 @@ jobs:
           mkdir -p test-server/mods
           
           # Get NeoForge version from gradle.properties
-          NEOFORGE_VERSION=$(grep "neoforgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
+          NEOFORGE_VERSION=$(grep "^neoforgeVersion=" gradle.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "Using NeoForge version: $NEOFORGE_VERSION"
           
           # Download NeoForge installer
