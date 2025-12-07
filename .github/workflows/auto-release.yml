@@ -135,7 +135,7 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }} [skip ci]"
           git push
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.new_version.outputs.new_version }}
@@ -154,4 +154,122 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Modrinth
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          
+          files: target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
+          
+          name: DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}
+          version: ${{ steps.new_version.outputs.new_version }}
+          version-type: release
+          
+          loaders: |
+            spigot
+            paper
+            purpur
+            bukkit
+          game-versions: |
+            1.14
+            1.14.1
+            1.14.2
+            1.14.3
+            1.14.4
+            1.15
+            1.15.1
+            1.15.2
+            1.16
+            1.16.1
+            1.16.2
+            1.16.3
+            1.16.4
+            1.16.5
+            1.17
+            1.17.1
+            1.18
+            1.18.1
+            1.18.2
+            1.19
+            1.19.1
+            1.19.2
+            1.19.3
+            1.19.4
+            1.20
+            1.20.1
+            1.20.2
+            1.20.3
+            1.20.4
+            1.20.5
+            1.20.6
+            1.21
+            1.21.1
+            1.21.2
+            1.21.3
+            1.21.4
+          
+          changelog: |
+            ${{ steps.changelog.outputs.changelog }}
+        continue-on-error: true
+
+      - name: Publish to Hangar
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          hangar-id: ${{ vars.HANGAR_PROJECT_ID }}
+          hangar-token: ${{ secrets.HANGAR_TOKEN }}
+          
+          files: target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
+          
+          name: DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}
+          version: ${{ steps.new_version.outputs.new_version }}
+          version-type: release
+          
+          loaders: |
+            spigot
+            paper
+            purpur
+            bukkit
+          game-versions: |
+            1.14
+            1.14.1
+            1.14.2
+            1.14.3
+            1.14.4
+            1.15
+            1.15.1
+            1.15.2
+            1.16
+            1.16.1
+            1.16.2
+            1.16.3
+            1.16.4
+            1.16.5
+            1.17
+            1.17.1
+            1.18
+            1.18.1
+            1.18.2
+            1.19
+            1.19.1
+            1.19.2
+            1.19.3
+            1.19.4
+            1.20
+            1.20.1
+            1.20.2
+            1.20.3
+            1.20.4
+            1.20.5
+            1.20.6
+            1.21
+            1.21.1
+            1.21.2
+            1.21.3
+            1.21.4
+          
+          changelog: |
+            ${{ steps.changelog.outputs.changelog }}
+        continue-on-error: true
 

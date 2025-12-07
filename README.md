@@ -39,13 +39,22 @@ disabled-worlds:
 mvn clean package
 ```
 
+## Downloads
+
+| Platform | Link |
+|----------|------|
+| GitHub Releases | [Download](https://github.com/capyblock/DisableVillagerTrade/releases) |
+| Modrinth | Coming soon |
+| Hangar | Coming soon |
+
 ## Releases
 
 This project uses automated releases via GitHub Actions. When changes are pushed or merged to the `master` branch:
 
 1. The version is automatically bumped based on [Conventional Commits](https://www.conventionalcommits.org/)
 2. A new GitHub Release is created with the compiled JAR
-3. A changelog is automatically generated
+3. The plugin is automatically published to **Modrinth** and **Hangar**
+4. A changelog is automatically generated
 
 ### Version Bumping
 
@@ -54,6 +63,29 @@ This project uses automated releases via GitHub Actions. When changes are pushed
 | `fix:` | `fix: resolve config loading error` | 1.6.0 → 1.6.1 (Patch) |
 | `feat:` | `feat: add wandering trader support` | 1.6.0 → 1.7.0 (Minor) |
 | `feat!:` or `BREAKING CHANGE:` | `feat!: new config format` | 1.6.0 → 2.0.0 (Major) |
+
+### Release Platform Setup (For Maintainers)
+
+To enable auto-publishing to Modrinth and Hangar, configure the following in your GitHub repository:
+
+<details>
+<summary><b>🔧 Setup Instructions</b></summary>
+
+#### Repository Variables (Settings → Secrets and variables → Actions → Variables)
+
+| Variable | Description |
+|----------|-------------|
+| `MODRINTH_PROJECT_ID` | Your Modrinth project ID (found in project URL or settings) |
+| `HANGAR_PROJECT_ID` | Your Hangar project slug (e.g., `DisableVillagerTrade`) |
+
+#### Repository Secrets (Settings → Secrets and variables → Actions → Secrets)
+
+| Secret | How to Get |
+|--------|------------|
+| `MODRINTH_TOKEN` | [Modrinth Settings](https://modrinth.com/settings/pats) → Create PAT with `Write projects` scope |
+| `HANGAR_TOKEN` | [Hangar API Keys](https://hangar.papermc.io/auth/settings/api-keys) → Create key with `create_version` permission |
+
+</details>
 
 ## Contributing
 
