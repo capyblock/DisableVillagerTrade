@@ -84,18 +84,27 @@ tasks {
                 "Implementation-Vendor" to "dodo"
             )
         }
-        finalizedBy("reobfJar")
     }
     
     jar {
         archiveClassifier.set("slim")
     }
     
-    named("reobfJar") {
-        dependsOn(shadowJar)
-    }
-    
     build {
         dependsOn(shadowJar)
+    }
+}
+
+// Configure reobfShadowJar if available (ForgeGradle adds reobf tasks after evaluation)
+afterEvaluate {
+    tasks.findByName("reobfShadowJar")?.let { reobfTask ->
+        tasks.named("shadowJar") {
+            finalizedBy(reobfTask)
+        }
+    }
+    tasks.findByName("reobfJar")?.let { reobfTask ->
+        tasks.named("shadowJar") {
+            finalizedBy(reobfTask)
+        }
     }
 }

@@ -22,7 +22,6 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
-    apply(plugin = "jacoco")
 
     java {
         toolchain {
@@ -43,7 +42,12 @@ subprojects {
             rename { "${it}_${rootProject.name}" }
         }
     }
+}
 
+// Apply JaCoCo only to testable modules (common, bukkit)
+configure(subprojects.filter { it.name in listOf("common", "bukkit") }) {
+    apply(plugin = "jacoco")
+    
     tasks.withType<JacocoReport> {
         reports {
             xml.required.set(true)
@@ -53,30 +57,5 @@ subprojects {
 
     tasks.withType<Test> {
         finalizedBy(tasks.withType<JacocoReport>())
-    }
-}
-
-// Aggregate coverage report for all modules
-tasks.register<JacocoReport>("jacocoRootReport") {
-    dependsOn(subprojects.flatMap { it.tasks.withType<Test>() })
-    
-    additionalSourceDirs.setFrom(files(subprojects.flatMap { 
-        it.the<SourceSetContainer>()["main"].allSource.srcDirs 
-    }))
-    sourceDirectories.setFrom(files(subprojects.flatMap { 
-        it.the<SourceSetContainer>()["main"].allSource.srcDirs 
-    }))
-    classDirectories.setFrom(files(subprojects.flatMap { 
-        it.the<SourceSetContainer>()["main"].output 
-    }))
-    executionData.setFrom(files(subprojects.flatMap {
-        it.tasks.withType<JacocoReport>().map { task -> task.executionData }
-    }).filter { it.exists() })
-
-    reports {
-        xml.required.set(true)
-        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/jacocoRootReport/jacocoRootReport.xml"))
-        html.required.set(true)
-        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/jacocoRootReport/html"))
     }
 }
