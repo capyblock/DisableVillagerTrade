@@ -145,6 +145,61 @@ Before submitting a PR:
 
 **Note:** All PRs must pass the automated test suite.
 
+## Code Coverage
+
+This project enforces a **minimum 90% code coverage** on testable code.
+
+### Running Coverage Locally
+
+```bash
+# Run tests with coverage report
+mvn test
+
+# View coverage report
+open target/site/jacoco/index.html
+
+# Verify coverage threshold
+mvn jacoco:check
+```
+
+### Coverage Rules
+
+| Rule | Threshold |
+|------|-----------|
+| Instruction Coverage | ≥ 90% |
+
+### What's Covered
+
+The following classes must maintain 90%+ coverage:
+
+- `PluginConfig` - Configuration handling
+- `ConfigMigrator` - Config migration logic
+- `TradeBlocker` - Core trade blocking logic
+- `UpdateNotifyListener` - Update notification logic
+
+### What's Excluded
+
+Some classes are excluded from coverage requirements because they depend on Bukkit runtime:
+
+- `DisableVillagerTrade` - Main plugin lifecycle
+- `VillagerTradeListener` - Direct Bukkit entity interaction
+- `UpdateChecker` - Bukkit scheduler and HTTP calls
+
+### Writing Testable Code
+
+To maintain high coverage:
+
+1. **Separate business logic** from Bukkit API calls (see `TradeBlocker`)
+2. **Use dependency injection** for testability
+3. **Mock external dependencies** using Mockito
+4. **Test edge cases** and error conditions
+
+### Coverage Enforcement
+
+- ❌ PRs will fail CI if coverage drops below 90%
+- ✅ Coverage reports are generated on every PR
+- 📊 Codecov provides coverage diff on PRs
+
 ## Reporting Issues
 
 When reporting bugs, please include:
