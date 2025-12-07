@@ -1,6 +1,7 @@
 # Disable Villager Trade
 
 [![Build](https://github.com/dodoflix/DisableVillagerTrade/actions/workflows/test.yml/badge.svg)](https://github.com/dodoflix/DisableVillagerTrade/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/dodoflix/DisableVillagerTrade/graph/badge.svg)](https://codecov.io/gh/dodoflix/DisableVillagerTrade)
 [![GitHub Release](https://img.shields.io/github/v/release/dodoflix/DisableVillagerTrade?label=release)](https://github.com/dodoflix/DisableVillagerTrade/releases)
 [![Modrinth Downloads](https://img.shields.io/modrinth/dt/disable-villager-trade?logo=modrinth&label=modrinth)](https://modrinth.com/plugin/disable-villager-trade)
 [![License](https://img.shields.io/github/license/dodoflix/DisableVillagerTrade)](LICENSE)

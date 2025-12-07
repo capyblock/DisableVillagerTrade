@@ -28,7 +28,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: mvn test -B
 
       - name: Generate test report
@@ -45,6 +45,20 @@ jobs:
               fi
             done
           fi
+          
+          # Add coverage summary
+          if [ -f "target/site/jacoco/index.html" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Code Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage report generated. See artifacts for details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: target/site/jacoco/jacoco.xml
+          fail_ci_if_error: false
+          verbose: true
 
       - name: Upload test results
         if: always()
@@ -52,6 +66,14 @@ jobs:
         with:
           name: test-results
           path: target/surefire-reports/
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
           retention-days: 7
 
   code-analysis:
