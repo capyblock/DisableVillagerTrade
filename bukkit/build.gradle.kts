@@ -38,6 +38,15 @@ tasks {
     shadowJar {
         archiveClassifier.set("")
         relocate("me.dodo.disablevillagertrade.common", "me.dodo.disablevillagertrade.bukkit.common")
+        
+        // Exclude duplicate LICENSE files to avoid Paper remapper issues
+        exclude("LICENSE")
+        exclude("LICENSE.txt")
+        exclude("META-INF/LICENSE")
+        exclude("META-INF/LICENSE.txt")
+        
+        // Merge service files
+        mergeServiceFiles()
     }
     
     build {
