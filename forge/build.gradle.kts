@@ -74,6 +74,15 @@ tasks {
         configurations = listOf(project.configurations.getByName("shadow"))
         relocate("me.dodo.disablevillagertrade.common", "me.dodo.disablevillagertrade.forge.common")
         
+        // Exclude duplicate LICENSE files
+        exclude("LICENSE")
+        exclude("LICENSE.txt")
+        exclude("META-INF/LICENSE")
+        exclude("META-INF/LICENSE.txt")
+        
+        // Merge service files
+        mergeServiceFiles()
+        
         manifest {
             attributes(
                 "Specification-Title" to "DisableVillagerTrade",
