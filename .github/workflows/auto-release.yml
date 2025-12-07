@@ -3,10 +3,15 @@ name: Auto Release
 on:
   push:
     branches:
-      - master
+      - master       # Production releases
+      - develop      # Development/snapshot releases
+      - pre-release  # Pre-release/RC versions
 
 permissions:
   contents: write
+
+env:
+  JAVA_VERSION: '21'
 
 jobs:
   release:
@@ -21,12 +26,38 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up JDK 21
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
           cache: maven
+
+      - name: Determine release type
+        id: release_type
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          
+          if [ "$BRANCH" = "master" ]; then
+            echo "type=production" >> $GITHUB_OUTPUT
+            echo "suffix=" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+            echo "modrinth_type=release" >> $GITHUB_OUTPUT
+            echo "📦 Production Release"
+          elif [ "$BRANCH" = "pre-release" ]; then
+            echo "type=pre-release" >> $GITHUB_OUTPUT
+            echo "suffix=-RC" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+            echo "modrinth_type=beta" >> $GITHUB_OUTPUT
+            echo "🧪 Pre-Release (Release Candidate)"
+          elif [ "$BRANCH" = "develop" ]; then
+            echo "type=development" >> $GITHUB_OUTPUT
+            echo "suffix=-SNAPSHOT" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+            echo "modrinth_type=alpha" >> $GITHUB_OUTPUT
+            echo "🔧 Development Release (Snapshot)"
+          fi
 
       - name: Run tests
         run: |
@@ -38,12 +69,16 @@ jobs:
         id: current_version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          # Remove any existing suffix
+          VERSION=$(echo "$VERSION" | sed 's/-SNAPSHOT//g' | sed 's/-RC[0-9]*//g')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 
       - name: Determine version bump from commits
         id: bump
         run: |
+          BRANCH="${{ steps.release_type.outputs.branch }}"
+          
           # Get commits since last tag (or all commits if no tag exists)
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
@@ -77,6 +112,8 @@ jobs:
         run: |
           CURRENT="${{ steps.current_version.outputs.version }}"
           BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
+          SUFFIX="${{ steps.release_type.outputs.suffix }}"
+          RELEASE_TYPE="${{ steps.release_type.outputs.type }}"
           
           # Parse version (handles both X.Y and X.Y.Z formats)
           IFS='.' read -ra VERSION_PARTS <<< "$CURRENT"
@@ -84,30 +121,59 @@ jobs:
           MINOR=${VERSION_PARTS[1]:-0}
           PATCH=${VERSION_PARTS[2]:-0}
           
-          case $BUMP_TYPE in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
+          # Only bump version for production releases
+          # Pre-release and dev use the NEXT version with suffix
+          if [ "$RELEASE_TYPE" = "production" ]; then
+            case $BUMP_TYPE in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          else
+            # For pre-release and dev, calculate next version with suffix
+            case $BUMP_TYPE in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            
+            # Add build number for non-production
+            BUILD_NUM=$(git rev-list --count HEAD)
+            if [ "$RELEASE_TYPE" = "pre-release" ]; then
+              NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}${SUFFIX}.${BUILD_NUM}"
+            else
+              NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}${SUFFIX}.${BUILD_NUM}"
+            fi
+          fi
           
-          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "base_version=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
 
       - name: Sync with remote
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git pull --rebase origin master
+          git pull --rebase origin ${{ steps.release_type.outputs.branch }}
 
       - name: Update version in pom.xml
         run: |
@@ -177,18 +243,34 @@ jobs:
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
       - name: Commit version bump
+        if: steps.release_type.outputs.type == 'production'
         run: |
           git add pom.xml
           git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }} [skip ci]"
-          git push origin master
+          git push origin ${{ steps.release_type.outputs.branch }}
+
+      - name: Get release title prefix
+        id: title
+        run: |
+          TYPE="${{ steps.release_type.outputs.type }}"
+          if [ "$TYPE" = "production" ]; then
+            echo "prefix=🚀" >> $GITHUB_OUTPUT
+            echo "label=Release" >> $GITHUB_OUTPUT
+          elif [ "$TYPE" = "pre-release" ]; then
+            echo "prefix=🧪" >> $GITHUB_OUTPUT
+            echo "label=Pre-Release" >> $GITHUB_OUTPUT
+          else
+            echo "prefix=🔧" >> $GITHUB_OUTPUT
+            echo "label=Development" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.new_version.outputs.new_version }}
-          name: DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}
+          name: "${{ steps.title.outputs.prefix }} DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}"
           body: |
-            > ${{ steps.changelog.outputs.summary }}
+            > **${{ steps.title.outputs.label }}** - ${{ steps.changelog.outputs.summary }}
             
             ## What's Changed
             
@@ -207,6 +289,10 @@ jobs:
             - **Server**: Spigot, Paper, Purpur, or compatible forks
             - **Java**: 21+
             
+            ## ⚠️ Release Type
+            
+            ${{ steps.release_type.outputs.type == 'production' && '✅ **Production Release** - Stable and ready for use' || steps.release_type.outputs.type == 'pre-release' && '🧪 **Pre-Release** - Testing before production, may have bugs' || '🔧 **Development Build** - Unstable, for testing only' }}
+            
             ## 🔗 Links
             
             - [Modrinth](https://modrinth.com/plugin/disablevillagertrade)
@@ -215,11 +301,13 @@ jobs:
           files: |
             target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.release_type.outputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Only publish to Modrinth for production and pre-release
       - name: Publish to Modrinth
+        if: steps.release_type.outputs.type != 'development'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
@@ -229,7 +317,7 @@ jobs:
           
           name: v${{ steps.new_version.outputs.new_version }} - ${{ steps.changelog.outputs.summary }}
           version: ${{ steps.new_version.outputs.new_version }}
-          version-type: release
+          version-type: ${{ steps.release_type.outputs.modrinth_type }}
           
           loaders: |
             spigot
@@ -275,7 +363,7 @@ jobs:
             1.21.4
           
           changelog: |
-            ## Release Summary
+            ## ${{ steps.title.outputs.label }} Summary
             > ${{ steps.changelog.outputs.summary }}
             
             ${{ steps.changelog.outputs.changelog }}
@@ -285,8 +373,9 @@ jobs:
             **Full Changelog**: [GitHub Releases](https://github.com/capyblock/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
         continue-on-error: true
 
+      # Only update Modrinth description for production releases
       - name: Update Modrinth Project Description
-        if: vars.MODRINTH_PROJECT_ID != ''
+        if: steps.release_type.outputs.type == 'production' && vars.MODRINTH_PROJECT_ID != ''
         run: |
           # Read description and summary from files
           DESCRIPTION=$(cat .modrinth/description.md)
@@ -317,18 +406,3 @@ jobs:
             exit 1
           fi
         continue-on-error: true
-
-      # Hangar auto-release is disabled for now
-      # To re-enable, uncomment the section below and set up HANGAR_TOKEN secret and HANGAR_PROJECT_ID variable
-      # - name: Publish to Hangar
-      #   uses: HangarMC/upload-action@v1
-      #   with:
-      #     api-key: ${{ secrets.HANGAR_TOKEN }}
-      #     slug: ${{ vars.HANGAR_PROJECT_ID }}
-      #     version: ${{ steps.new_version.outputs.new_version }}
-      #     channel: Release
-      #     files: '{"PAPER": "target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar"}'
-      #     platform-versions: '{"PAPER": ["1.14-1.21.4"]}'
-      #     changelog: ${{ steps.changelog.outputs.changelog }}
-      #   continue-on-error: true
-

@@ -6,9 +6,27 @@ Thank you for your interest in contributing to DisableVillagerTrade! This docume
 
 1. Fork the repository
 2. Clone your fork locally
-3. Create a new branch for your feature or fix
+3. Create a new branch from `develop` for your feature or fix
 4. Make your changes
-5. Submit a pull request
+5. Submit a pull request to `develop`
+
+## Branch Strategy
+
+This project uses a three-stage release pipeline:
+
+```
+develop → pre-release → master
+   ↑
+ Your PR
+```
+
+| Branch | Purpose |
+|--------|---------|
+| `develop` | Active development, submit PRs here |
+| `pre-release` | Release candidates for testing |
+| `master` | Production releases only |
+
+**Always create PRs targeting `develop`**, not `master`.
 
 ## Development Setup
 

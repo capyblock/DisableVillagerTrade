@@ -49,7 +49,6 @@ mvn test
 
 The project uses:
 - **JUnit 5** - Testing framework
-- **MockBukkit** - Bukkit/Spigot mocking library
 - **Mockito** - Mocking framework
 
 Tests are automatically run on every push and pull request via GitHub Actions.
@@ -59,16 +58,39 @@ Tests are automatically run on every push and pull request via GitHub Actions.
 | Platform | Link |
 |----------|------|
 | GitHub Releases | [Download](https://github.com/capyblock/DisableVillagerTrade/releases) |
-| Modrinth | Coming soon |
+| Modrinth | [Download](https://modrinth.com/plugin/disablevillagertrade) |
 
-## Releases
+## Release Pipeline
 
-This project uses automated releases via GitHub Actions. When changes are pushed or merged to the `master` branch:
+This project uses a **three-stage release pipeline** with automated deployments:
 
-1. The version is automatically bumped based on [Conventional Commits](https://www.conventionalcommits.org/)
-2. A new GitHub Release is created with the compiled JAR
-3. The plugin is automatically published to **Modrinth**
-4. A changelog is automatically generated
+```
+develop → pre-release → master (production)
+```
+
+### Branches & Release Types
+
+| Branch | Release Type | Version Format | Published To |
+|--------|--------------|----------------|--------------|
+| `develop` | 🔧 Development | `1.2.3-SNAPSHOT.123` | GitHub only |
+| `pre-release` | 🧪 Pre-Release (RC) | `1.2.3-RC.123` | GitHub + Modrinth (beta) |
+| `master` | 🚀 Production | `1.2.3` | GitHub + Modrinth (release) |
+
+### Development Workflow
+
+1. **Development**: Work on `develop` branch
+   - Automatic snapshot releases for testing
+   - Not published to Modrinth
+
+2. **Pre-Release**: Merge `develop` → `pre-release`
+   - Creates Release Candidate (RC) version
+   - Published to Modrinth as **beta**
+   - Test on staging servers
+
+3. **Production**: Merge `pre-release` → `master`
+   - Creates stable production release
+   - Published to Modrinth as **release**
+   - Version bumped permanently
 
 ### Version Bumping
 
@@ -79,8 +101,6 @@ This project uses automated releases via GitHub Actions. When changes are pushed
 | `feat!:` or `BREAKING CHANGE:` | `feat!: new config format` | 1.6.0 → 2.0.0 (Major) |
 
 ### Release Platform Setup (For Maintainers)
-
-To enable auto-publishing to Modrinth, configure the following in your GitHub repository:
 
 <details>
 <summary><b>🔧 Setup Instructions</b></summary>
