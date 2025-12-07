@@ -85,8 +85,10 @@ jobs:
           echo ""
           echo "📋 Checking plugin status..."
           
-          if grep -q "\[DisableVillagerTrade\]" logs/latest.log; then
+          # Check if plugin was initialized (Paper shows it in plugin list)
+          if grep -qi "DisableVillagerTrade" logs/latest.log; then
             echo "✅ Plugin loaded!"
+            grep -i "DisableVillagerTrade" logs/latest.log | head -5
           else
             echo "❌ Plugin failed to load!"
             cat logs/latest.log
@@ -102,16 +104,22 @@ jobs:
             exit 1
           fi
           
+          # Check for failed to load messages
+          if grep -qi "Could not load.*DisableVillagerTrade\|failed to load.*DisableVillagerTrade" logs/latest.log; then
+            echo "❌ Plugin failed to load!"
+            grep -i "DisableVillagerTrade" logs/latest.log
+            kill $SERVER_PID 2>/dev/null
+            exit 1
+          fi
+          
           echo "✅ No errors detected!"
           
           # Graceful shutdown
-          echo "stop" | nc -q 1 localhost 25575 2>/dev/null || true
-          sleep 2
           kill $SERVER_PID 2>/dev/null || true
           
           echo ""
           echo "📜 Plugin log entries:"
-          grep "\[DisableVillagerTrade\]" logs/latest.log || echo "No plugin log entries found"
+          grep -i "DisableVillagerTrade" logs/latest.log | head -10 || echo "No plugin log entries found"
       
       - name: Upload logs on failure
         if: failure()

@@ -149,14 +149,22 @@ jobs:
             sleep 1
           done
           
-          if grep -q "\[DisableVillagerTrade\]" logs/latest.log; then
+          # Check if plugin was initialized (Paper shows it in plugin list)
+          if grep -qi "DisableVillagerTrade" logs/latest.log; then
             echo "✅ Plugin loaded successfully!"
+            grep -i "DisableVillagerTrade" logs/latest.log | head -5
           else
             echo "❌ Plugin failed to load!"; cat logs/latest.log; exit 1
           fi
           
+          # Check for plugin-specific errors
           if grep -qiE "(ERROR|SEVERE).*DisableVillagerTrade" logs/latest.log; then
             echo "❌ Plugin has errors!"; grep -iE "(ERROR|SEVERE)" logs/latest.log; exit 1
+          fi
+          
+          # Check for failed to load messages
+          if grep -qi "Could not load.*DisableVillagerTrade\|failed to load.*DisableVillagerTrade" logs/latest.log; then
+            echo "❌ Plugin failed to load!"; grep -i "DisableVillagerTrade" logs/latest.log; exit 1
           fi
           
           kill $SERVER_PID 2>/dev/null || true
