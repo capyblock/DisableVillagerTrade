@@ -51,6 +51,9 @@ repositories {
 dependencies {
     minecraft("net.minecraftforge:forge:$forgeVersion")
     
+    // EventBus annotation processor (required for Forge 60.x)
+    annotationProcessor("net.minecraftforge:eventbus-validator:7.0-beta.12")
+    
     // Include common module
     implementation(project(":common"))
     shadow(project(":common"))

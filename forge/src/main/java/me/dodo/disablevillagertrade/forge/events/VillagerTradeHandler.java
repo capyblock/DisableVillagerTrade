@@ -9,13 +9,14 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.eventbus.api.listener.SubscribeEvent;
 
 /**
  * Handles villager interaction events for Forge.
  */
 public class VillagerTradeHandler {
     
-    @net.minecraftforge.eventbus.api.SubscribeEvent
+    @SubscribeEvent
     public void onPlayerInteractEntity(PlayerInteractEvent.EntityInteract event) {
         // Only process villager interactions
         if (!(event.getTarget() instanceof Villager villager)) {

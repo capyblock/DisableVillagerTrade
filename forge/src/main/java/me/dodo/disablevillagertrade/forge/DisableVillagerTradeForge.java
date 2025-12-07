@@ -7,10 +7,11 @@ import me.dodo.disablevillagertrade.forge.config.ForgeConfig;
 import me.dodo.disablevillagertrade.forge.events.VillagerTradeHandler;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.eventbus.api.bus.BusGroup;
+import net.minecraftforge.eventbus.api.listener.SubscribeEvent;
 import net.minecraftforge.fml.ModContainer;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
@@ -18,6 +19,7 @@ import net.minecraftforge.fml.config.ModConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.lang.invoke.MethodHandles;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -48,14 +50,14 @@ public class DisableVillagerTradeForge {
         // Initialize trade blocker
         tradeBlocker = new TradeBlocker();
         
-        // Register event handlers
-        MinecraftForge.EVENT_BUS.register(this);
-        MinecraftForge.EVENT_BUS.register(new VillagerTradeHandler());
+        // Register event handlers using new Forge 60.x API
+        BusGroup.DEFAULT.register(MethodHandles.lookup(), this);
+        BusGroup.DEFAULT.register(MethodHandles.lookup(), new VillagerTradeHandler());
         
         LOGGER.info("DisableVillagerTrade initialized!");
     }
     
-    @net.minecraftforge.eventbus.api.SubscribeEvent
+    @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
         // Initialize update checker
         if (ForgeConfig.UPDATE_CHECKER_ENABLED.get()) {
@@ -81,14 +83,14 @@ public class DisableVillagerTradeForge {
         }
     }
     
-    @net.minecraftforge.eventbus.api.SubscribeEvent
+    @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         if (scheduler != null) {
             scheduler.shutdown();
         }
     }
     
-    @net.minecraftforge.eventbus.api.SubscribeEvent
+    @SubscribeEvent
     public void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             if (ForgeConfig.NOTIFY_ON_JOIN.get() && updateChecker != null && updateChecker.isUpdateAvailable()) {
