@@ -1,4 +1,10 @@
 # Disable Villager Trade
+
+[![Build](https://github.com/capyblock/DisableVillagerTrade/actions/workflows/test.yml/badge.svg)](https://github.com/capyblock/DisableVillagerTrade/actions/workflows/test.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/capyblock/DisableVillagerTrade?label=release)](https://github.com/capyblock/DisableVillagerTrade/releases)
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/disable-villager-trade?logo=modrinth&label=modrinth)](https://modrinth.com/plugin/disable-villager-trade)
+[![License](https://img.shields.io/github/license/capyblock/DisableVillagerTrade)](LICENSE)
+
 Disable villager trade on your minecraft spigot based server!
 
 ## Supported Versions
@@ -64,7 +70,7 @@ Tests are automatically run on every push and pull request via GitHub Actions.
 | Platform | Link |
 |----------|------|
 | GitHub Releases | [Download](https://github.com/capyblock/DisableVillagerTrade/releases) |
-| Modrinth | [Download](https://modrinth.com/plugin/disablevillagertrade) |
+| Modrinth | [Download](https://modrinth.com/plugin/disable-villager-trade) |
 
 ## Release Pipeline
 
