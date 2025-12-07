@@ -11,3 +11,6 @@ permissions:
   disabletrade.bypass:
     description: Allows the player to bypass the trade block and trade with villagers.
     default: op
+  disabletrade.update:
+    description: Receives update notifications when a new version is available.
+    default: op

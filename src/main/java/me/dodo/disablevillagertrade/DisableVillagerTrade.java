@@ -2,8 +2,10 @@ package me.dodo.disablevillagertrade;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import me.dodo.disablevillagertrade.config.ConfigMigrator;
+import me.dodo.disablevillagertrade.listeners.UpdateNotifyListener;
 import me.dodo.disablevillagertrade.listeners.VillagerTradeListener;
 import me.dodo.disablevillagertrade.config.PluginConfig;
+import me.dodo.disablevillagertrade.update.UpdateChecker;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -14,6 +16,7 @@ public final class DisableVillagerTrade extends JavaPlugin {
     
     private static DisableVillagerTrade instance;
     private PluginConfig pluginConfig;
+    private UpdateChecker updateChecker;
 
     @Override
     @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", 
@@ -34,6 +37,18 @@ public final class DisableVillagerTrade extends JavaPlugin {
         // Register event listeners
         getServer().getPluginManager().registerEvents(new VillagerTradeListener(this), this);
         
+        // Initialize update checker if enabled
+        if (pluginConfig.isUpdateCheckerEnabled()) {
+            this.updateChecker = new UpdateChecker(this);
+            updateChecker.startChecking(pluginConfig.getUpdateCheckInterval());
+            
+            // Register update notification listener if notify-on-join is enabled
+            if (pluginConfig.isNotifyOnJoin()) {
+                getServer().getPluginManager().registerEvents(
+                    new UpdateNotifyListener(this, updateChecker, pluginConfig), this);
+            }
+        }
+        
         getLogger().info("DisableVillagerTrade has been enabled!");
     }
 
@@ -41,6 +56,11 @@ public final class DisableVillagerTrade extends JavaPlugin {
     @SuppressFBWarnings(value = "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD", 
         justification = "Singleton pattern required for Bukkit plugin lifecycle")
     public void onDisable() {
+        // Stop update checker
+        if (updateChecker != null) {
+            updateChecker.stopChecking();
+        }
+        
         getLogger().info("DisableVillagerTrade has been disabled!");
         instance = null;
     }
