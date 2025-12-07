@@ -1,45 +1,17 @@
-package me.dodo.disablevillagertrade.update;
+package me.dodo.disablevillagertrade.common;
 
-import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-
-import java.util.logging.Logger;
+import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("UpdateChecker Tests")
 class UpdateCheckerTest {
-
-    @Mock
-    private JavaPlugin mockPlugin;
-    
-    @Mock
-    private PluginDescriptionFile mockDescription;
-    
-    @Mock
-    private Logger mockLogger;
 
     private UpdateChecker updateChecker;
 
     @BeforeEach
     void setUp() {
-        when(mockPlugin.getDescription()).thenReturn(mockDescription);
-        when(mockPlugin.getLogger()).thenReturn(mockLogger);
-        when(mockDescription.getVersion()).thenReturn("1.12.0");
-        
-        updateChecker = new UpdateChecker(mockPlugin);
+        updateChecker = new UpdateChecker("1.12.0", "TestAgent/1.0", msg -> {});
     }
 
     @Nested
@@ -128,8 +100,8 @@ class UpdateCheckerTest {
         }
 
         @Test
-        @DisplayName("Should return current version from plugin")
-        void shouldReturnCurrentVersionFromPlugin() {
+        @DisplayName("Should return current version")
+        void shouldReturnCurrentVersion() {
             assertEquals("1.12.0", updateChecker.getCurrentVersion());
         }
     }

@@ -14,4 +14,5 @@ rootProject.name = "DisableVillagerTrade"
 include("common")
 include("bukkit")
 include("fabric")
+include("forge")
 include("neoforge")

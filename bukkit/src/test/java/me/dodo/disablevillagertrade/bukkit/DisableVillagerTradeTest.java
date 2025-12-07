@@ -1,4 +1,4 @@
-package me.dodo.disablevillagertrade;
+package me.dodo.disablevillagertrade.bukkit;
 
 import org.junit.jupiter.api.*;
 
@@ -54,3 +54,4 @@ class DisableVillagerTradeTest {
         assertTrue(Modifier.isFinal(DisableVillagerTrade.class.getModifiers()));
     }
 }
+

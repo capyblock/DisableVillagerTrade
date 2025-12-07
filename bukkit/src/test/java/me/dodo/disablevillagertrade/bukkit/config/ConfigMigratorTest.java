@@ -1,4 +1,4 @@
-package me.dodo.disablevillagertrade.config;
+package me.dodo.disablevillagertrade.bukkit.config;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -167,3 +167,4 @@ class ConfigMigratorTest {
         }
     }
 }
+

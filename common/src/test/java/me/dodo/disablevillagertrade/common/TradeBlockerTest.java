@@ -1,4 +1,4 @@
-package me.dodo.disablevillagertrade.logic;
+package me.dodo.disablevillagertrade.common;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;

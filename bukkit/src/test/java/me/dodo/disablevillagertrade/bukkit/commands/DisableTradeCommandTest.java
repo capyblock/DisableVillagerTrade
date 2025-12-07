@@ -1,7 +1,7 @@
-package me.dodo.disablevillagertrade.commands;
+package me.dodo.disablevillagertrade.bukkit.commands;
 
-import me.dodo.disablevillagertrade.DisableVillagerTrade;
-import me.dodo.disablevillagertrade.config.PluginConfig;
+import me.dodo.disablevillagertrade.bukkit.DisableVillagerTrade;
+import me.dodo.disablevillagertrade.bukkit.config.BukkitConfig;
 import org.bukkit.Server;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -32,7 +32,7 @@ class DisableTradeCommandTest {
     private DisableVillagerTrade plugin;
     
     @Mock
-    private PluginConfig pluginConfig;
+    private BukkitConfig pluginConfig;
     
     @Mock
     private Command command;

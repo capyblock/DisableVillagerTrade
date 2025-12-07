@@ -1,7 +1,7 @@
-package me.dodo.disablevillagertrade.listeners;
+package me.dodo.disablevillagertrade.bukkit.listeners;
 
-import me.dodo.disablevillagertrade.config.PluginConfig;
-import me.dodo.disablevillagertrade.update.UpdateChecker;
+import me.dodo.disablevillagertrade.bukkit.config.BukkitConfig;
+import me.dodo.disablevillagertrade.bukkit.update.BukkitUpdateChecker;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -30,10 +30,10 @@ class UpdateNotifyListenerTest {
     private JavaPlugin mockPlugin;
 
     @Mock
-    private UpdateChecker mockUpdateChecker;
+    private BukkitUpdateChecker mockUpdateChecker;
 
     @Mock
-    private PluginConfig mockConfig;
+    private BukkitConfig mockConfig;
 
     @Mock
     private PlayerJoinEvent mockEvent;
@@ -180,3 +180,4 @@ class UpdateNotifyListenerTest {
         }
     }
 }
+

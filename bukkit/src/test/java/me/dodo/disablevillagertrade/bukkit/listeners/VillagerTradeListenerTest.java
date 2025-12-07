@@ -1,4 +1,4 @@
-package me.dodo.disablevillagertrade.listeners;
+package me.dodo.disablevillagertrade.bukkit.listeners;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -56,3 +56,4 @@ class VillagerTradeListenerTest {
         assertTrue(hasPluginConstructor);
     }
 }
+

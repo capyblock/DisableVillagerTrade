@@ -1,8 +1,8 @@
 package me.dodo.disablevillagertrade.forge.events;
 
-import me.dodo.disablevillagertrade.common.Constants;
 import me.dodo.disablevillagertrade.forge.DisableVillagerTradeForge;
 import me.dodo.disablevillagertrade.forge.config.ForgeConfig;
+import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.npc.Villager;
@@ -33,9 +33,11 @@ public class VillagerTradeHandler {
             return;
         }
         
-        // Get profession name
-        VillagerProfession profession = villager.getVillagerData().getProfession();
-        String professionName = profession.name().toUpperCase();
+        // Get profession name - profession() returns Holder<VillagerProfession>
+        Holder<VillagerProfession> professionHolder = villager.getVillagerData().profession();
+        String professionName = professionHolder.unwrapKey()
+            .map(key -> key.location().getPath().toUpperCase())
+            .orElse("NONE");
         
         // Get dimension name
         String dimensionName = player.level().dimension().location().toString();
@@ -68,4 +70,3 @@ public class VillagerTradeHandler {
         }
     }
 }
-

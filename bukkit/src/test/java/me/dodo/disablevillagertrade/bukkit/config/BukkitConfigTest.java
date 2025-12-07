@@ -1,4 +1,4 @@
-package me.dodo.disablevillagertrade.config;
+package me.dodo.disablevillagertrade.bukkit.config;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -18,8 +18,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("PluginConfig Tests")
-class PluginConfigTest {
+@DisplayName("BukkitConfig Tests")
+class BukkitConfigTest {
 
     @Mock
     private JavaPlugin mockPlugin;
@@ -47,7 +47,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(false);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("test");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertTrue(config.isMessageEnabled());
         }
@@ -63,7 +63,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(false);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("test");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertFalse(config.isMessageEnabled());
         }
@@ -80,7 +80,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(false);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("test");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertEquals(customMessage, config.getMessage());
         }
@@ -102,7 +102,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(false);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("test");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertEquals(worlds, config.getDisabledWorlds());
             assertEquals(2, config.getDisabledWorlds().size());
@@ -119,7 +119,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(false);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("test");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertTrue(config.getDisabledWorlds().isEmpty());
         }
@@ -135,7 +135,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(false);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("test");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertNotNull(config.getDisabledWorlds());
             assertTrue(config.getDisabledWorlds().isEmpty());
@@ -157,7 +157,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(true);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("Update!");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertTrue(config.isUpdateCheckerEnabled());
         }
@@ -173,7 +173,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(true);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("Update!");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertEquals(12, config.getUpdateCheckInterval());
         }
@@ -189,7 +189,7 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(false);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn("Update!");
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertFalse(config.isNotifyOnJoin());
         }
@@ -206,9 +206,10 @@ class PluginConfigTest {
             when(mockConfig.getBoolean("update-checker.notify-on-join", true)).thenReturn(true);
             when(mockConfig.getString(eq("update-checker.message"), anyString())).thenReturn(updateMsg);
 
-            PluginConfig config = new PluginConfig(mockPlugin);
+            BukkitConfig config = new BukkitConfig(mockPlugin);
 
             assertEquals(updateMsg, config.getUpdateMessage());
         }
     }
 }
+
