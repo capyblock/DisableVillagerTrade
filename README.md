@@ -43,9 +43,10 @@ disabled-worlds:
 
 ## Permissions
 
-| Permission | Description |
-|------------|-------------|
-| `disabletrade.bypass` | Allows the player to trade with villagers |
+| Permission | Description | Default |
+|------------|-------------|---------|
+| `disabletrade.bypass` | Allows the player to bypass trade block | OP |
+| `disabletrade.update` | Receives update notifications on join | OP |
 
 ## Downloads
 

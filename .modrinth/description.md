@@ -34,9 +34,10 @@ disabled-worlds:
 
 ## 🔑 Permissions
 
-| Permission | Description |
-|------------|-------------|
-| `disabletrade.bypass` | Allows the player to trade with villagers |
+| Permission | Description | Default |
+|------------|-------------|---------|
+| `disabletrade.bypass` | Allows the player to bypass trade block | OP |
+| `disabletrade.update` | Receives update notifications on join | OP |
 
 ## 💻 Supported Versions
 
@@ -46,11 +47,11 @@ disabled-worlds:
 
 ## 🔗 Links
 
-- [Source Code](https://github.com/capyblock/DisableVillagerTrade)
-- [Issue Tracker](https://github.com/capyblock/DisableVillagerTrade/issues)
-- [Changelog](https://github.com/capyblock/DisableVillagerTrade/releases)
+- [Source Code](https://github.com/dodoflix/DisableVillagerTrade)
+- [Issue Tracker](https://github.com/dodoflix/DisableVillagerTrade/issues)
+- [Changelog](https://github.com/dodoflix/DisableVillagerTrade/releases)
 
 ## 📄 License
 
-This project is open source under the [MIT License](https://github.com/capyblock/DisableVillagerTrade/blob/master/LICENSE).
+This project is open source under the [MIT License](https://github.com/dodoflix/DisableVillagerTrade/blob/master/LICENSE).
 
