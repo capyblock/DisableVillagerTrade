@@ -13,7 +13,41 @@ env:
   JAVA_VERSION: '21'
 
 jobs:
+  code-analysis:
+    name: Code Analysis
+    # Skip if commit message contains [skip ci]
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compile project
+        run: mvn compile -B
+
+      - name: Run SpotBugs analysis
+        run: |
+          echo "🔍 Running SpotBugs static analysis..."
+          mvn spotbugs:check -B
+          echo "✅ SpotBugs analysis passed!"
+
+      - name: Run PMD analysis
+        run: |
+          echo "🔍 Running PMD code analysis..."
+          mvn pmd:check -B
+          echo "✅ PMD analysis passed!"
+
   release:
+    name: Build & Release
+    needs: code-analysis
     # Skip if commit message contains [skip ci]
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
@@ -287,7 +321,7 @@ jobs:
             ## What's New
             ${{ steps.changelog.outputs.changelog }}
             
-            **Full Changelog**: [GitHub](https://github.com/capyblock/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
+            **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
         continue-on-error: true
 
       - name: Update Modrinth Description
