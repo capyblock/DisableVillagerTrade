@@ -17,7 +17,7 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 
 1. **Do NOT** open a public GitHub issue for security vulnerabilities
 2. Instead, please report vulnerabilities via one of these methods:
-   - **GitHub Security Advisories**: [Report a vulnerability](https://github.com/capyblock/DisableVillagerTrade/security/advisories/new)
+   - **GitHub Security Advisories**: [Report a vulnerability](https://github.com/dodoflix/DisableVillagerTrade/security/advisories/new)
    - **Email**: Contact the repository owner directly
 
 ### What to Include

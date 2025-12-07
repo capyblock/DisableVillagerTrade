@@ -5,7 +5,7 @@ api-version: '1.21'
 authors:
   - dodo
 description: A lightweight plugin to prevent players from trading with villagers.
-website: https://github.com/capyblock/DisableVillagerTrade
+website: https://github.com/dodoflix/DisableVillagerTrade
 
 permissions:
   disabletrade.bypass:
