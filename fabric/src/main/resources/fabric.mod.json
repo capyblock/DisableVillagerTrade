@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "disablevillagertrade",
+  "version": "${version}",
+  "name": "DisableVillagerTrade",
+  "description": "A lightweight mod to prevent players from trading with villagers.",
+  "authors": ["dodo"],
+  "contact": {
+    "homepage": "https://github.com/dodoflix/DisableVillagerTrade",
+    "sources": "https://github.com/dodoflix/DisableVillagerTrade",
+    "issues": "https://github.com/dodoflix/DisableVillagerTrade/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/disablevillagertrade/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "me.dodo.disablevillagertrade.fabric.DisableVillagerTradeFabric"
+    ],
+    "client": [
+      "me.dodo.disablevillagertrade.fabric.DisableVillagerTradeFabricClient"
+    ]
+  },
+  "mixins": [
+    "disablevillagertrade.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "fabric-permissions-api-v0": "*"
+  }
+}
