@@ -112,9 +112,20 @@ jobs:
       - name: Get current version
         id: current_version
         run: |
-          VERSION=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
+          # Try modVersion first, then mod_version as fallback
+          VERSION=$(grep "^modVersion=" gradle.properties | cut -d'=' -f2)
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep "^mod_version=" gradle.properties | cut -d'=' -f2)
+          fi
           # Remove any existing suffix
           VERSION=$(echo "$VERSION" | sed 's/-dev.*//g' | sed 's/-SNAPSHOT//g')
+          
+          # Fallback if still empty
+          if [ -z "$VERSION" ]; then
+            echo "⚠️ Could not read version from gradle.properties, using 1.12.0 as fallback"
+            VERSION="1.12.0"
+          fi
+          
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $VERSION"
 
@@ -196,8 +207,14 @@ jobs:
       - name: Update version in gradle.properties
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
-          sed -i "s/^mod_version=.*/mod_version=$NEW_VERSION/" gradle.properties
+          # Update modVersion (or mod_version if that's used)
+          if grep -q "^modVersion=" gradle.properties; then
+            sed -i "s/^modVersion=.*/modVersion=$NEW_VERSION/" gradle.properties
+          else
+            sed -i "s/^mod_version=.*/mod_version=$NEW_VERSION/" gradle.properties
+          fi
           echo "Updated gradle.properties to version $NEW_VERSION"
+          cat gradle.properties | grep -E "^mod[Vv]ersion="
 
       - name: Build all platforms
         run: |
@@ -250,13 +267,17 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
-      # Only commit version bump for production releases
+      # Commit version bump for both production and develop
       - name: Commit version bump
-        if: steps.release_type.outputs.is_production == 'true'
         run: |
           git add gradle.properties
-          git commit -m "chore: release v${{ steps.new_version.outputs.new_version }} [skip ci]"
-          git push origin master
+          BRANCH="${{ steps.release_type.outputs.branch }}"
+          if [ "${{ steps.release_type.outputs.is_production }}" = "true" ]; then
+            git commit -m "chore: release v${{ steps.new_version.outputs.new_version }} [skip ci]"
+          else
+            git commit -m "chore: dev build v${{ steps.new_version.outputs.new_version }} [skip ci]"
+          fi
+          git push origin $BRANCH
 
       - name: Collect artifacts
         id: artifacts
