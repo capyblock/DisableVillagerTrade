@@ -258,7 +258,7 @@ jobs:
             - **Minecraft**: 1.14 - 1.21.4+
             - **Server**: Spigot, Paper, Purpur
             - **Java**: 21+
-          files: target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
+          files: target/DisableVillagerTrade-${{ steps.new_version.outputs.new_version }}.jar
           draft: false
           prerelease: ${{ steps.release_type.outputs.is_production != 'true' }}
         env:
@@ -271,7 +271,7 @@ jobs:
         with:
           modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
+          files: target/DisableVillagerTrade-${{ steps.new_version.outputs.new_version }}.jar
           name: v${{ steps.new_version.outputs.new_version }} - ${{ steps.changelog.outputs.summary }}
           version: ${{ steps.new_version.outputs.new_version }}
           version-type: release
@@ -322,7 +322,6 @@ jobs:
             ${{ steps.changelog.outputs.changelog }}
             
             **Full Changelog**: [GitHub](https://github.com/dodoflix/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
-        continue-on-error: true
 
       - name: Update Modrinth Description
         if: steps.release_type.outputs.is_production == 'true' && vars.MODRINTH_PROJECT_ID != ''
