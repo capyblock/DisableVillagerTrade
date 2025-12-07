@@ -39,6 +39,21 @@ disabled-worlds:
 mvn clean package
 ```
 
+## Testing
+
+Run the test suite:
+
+```bash
+mvn test
+```
+
+The project uses:
+- **JUnit 5** - Testing framework
+- **MockBukkit** - Bukkit/Spigot mocking library
+- **Mockito** - Mocking framework
+
+Tests are automatically run on every push and pull request via GitHub Actions.
+
 ## Downloads
 
 | Platform | Link |

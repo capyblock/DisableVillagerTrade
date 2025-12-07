@@ -28,6 +28,12 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Run tests
+        run: |
+          echo "🧪 Running tests before release..."
+          mvn test -B
+          echo "✅ All tests passed!"
+
       - name: Get current version
         id: current_version
         run: |
