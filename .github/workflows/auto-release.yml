@@ -112,21 +112,63 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      - name: Generate changelog
+      - name: Generate changelog and summary
         id: changelog
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
           if [ -z "$LAST_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+            COMMITS=$(git log --pretty=format:"%s|%h" --no-merges)
           else
-            CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s|%h" --no-merges)
           fi
           
-          # Handle multiline output
+          # Categorize commits
+          FEATURES=""
+          FIXES=""
+          OTHER=""
+          
+          while IFS='|' read -r msg hash; do
+            [ -z "$msg" ] && continue
+            if echo "$msg" | grep -qiE "^feat(\(.*\))?!?:"; then
+              FEATURES="${FEATURES}- ${msg} (\`${hash}\`)\n"
+            elif echo "$msg" | grep -qiE "^fix(\(.*\))?:"; then
+              FIXES="${FIXES}- ${msg} (\`${hash}\`)\n"
+            elif echo "$msg" | grep -qiE "^(chore|docs|style|refactor|perf|test)(\(.*\))?:"; then
+              OTHER="${OTHER}- ${msg} (\`${hash}\`)\n"
+            else
+              OTHER="${OTHER}- ${msg} (\`${hash}\`)\n"
+            fi
+          done <<< "$COMMITS"
+          
+          # Build changelog
+          CHANGELOG=""
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG="${CHANGELOG}### ✨ New Features\n${FEATURES}\n"
+          fi
+          if [ -n "$FIXES" ]; then
+            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n"
+          fi
+          if [ -n "$OTHER" ]; then
+            CHANGELOG="${CHANGELOG}### 🔧 Other Changes\n${OTHER}\n"
+          fi
+          
+          # Generate summary (count of changes)
+          FEAT_COUNT=$(echo -e "$FEATURES" | grep -c "^-" || echo "0")
+          FIX_COUNT=$(echo -e "$FIXES" | grep -c "^-" || echo "0")
+          
+          SUMMARY=""
+          [ "$FEAT_COUNT" -gt 0 ] && SUMMARY="${SUMMARY}${FEAT_COUNT} new feature(s)"
+          [ "$FIX_COUNT" -gt 0 ] && [ -n "$SUMMARY" ] && SUMMARY="${SUMMARY}, "
+          [ "$FIX_COUNT" -gt 0 ] && SUMMARY="${SUMMARY}${FIX_COUNT} bug fix(es)"
+          [ -z "$SUMMARY" ] && SUMMARY="Maintenance release"
+          
+          # Output
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
 
       - name: Commit version bump
         run: |
@@ -138,15 +180,32 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.new_version.outputs.new_version }}
-          name: Release v${{ steps.new_version.outputs.new_version }}
+          name: DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}
           body: |
+            > ${{ steps.changelog.outputs.summary }}
+            
             ## What's Changed
             
             ${{ steps.changelog.outputs.changelog }}
             
-            ## Installation
+            ## 📦 Installation
             
-            Download `DisableVillagerTrade-${{ steps.new_version.outputs.new_version }}.jar` and place it in your server's `plugins` folder.
+            1. Download `disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar` below
+            2. Place it in your server's `plugins` folder
+            3. Restart your server
+            4. Configure in `plugins/DisableVillagerTrade/config.yml`
+            
+            ## 📋 Requirements
+            
+            - **Minecraft**: 1.14 - 1.21.4+
+            - **Server**: Spigot, Paper, Purpur, or compatible forks
+            - **Java**: 21+
+            
+            ## 🔗 Links
+            
+            - [Modrinth](https://modrinth.com/plugin/disablevillagertrade)
+            - [Source Code](https://github.com/capyblock/DisableVillagerTrade)
+            - [Report Issues](https://github.com/capyblock/DisableVillagerTrade/issues)
           files: |
             target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
           draft: false
@@ -162,7 +221,7 @@ jobs:
           
           files: target/disablevillagertrade-${{ steps.new_version.outputs.new_version }}.jar
           
-          name: DisableVillagerTrade v${{ steps.new_version.outputs.new_version }}
+          name: v${{ steps.new_version.outputs.new_version }} - ${{ steps.changelog.outputs.summary }}
           version: ${{ steps.new_version.outputs.new_version }}
           version-type: release
           
@@ -210,7 +269,14 @@ jobs:
             1.21.4
           
           changelog: |
+            ## Release Summary
+            > ${{ steps.changelog.outputs.summary }}
+            
             ${{ steps.changelog.outputs.changelog }}
+            
+            ---
+            
+            **Full Changelog**: [GitHub Releases](https://github.com/capyblock/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
         continue-on-error: true
 
       # Hangar auto-release is disabled for now
