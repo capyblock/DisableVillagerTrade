@@ -279,6 +279,25 @@ jobs:
             **Full Changelog**: [GitHub Releases](https://github.com/capyblock/DisableVillagerTrade/releases/tag/v${{ steps.new_version.outputs.new_version }})
         continue-on-error: true
 
+      - name: Update Modrinth Project Description
+        if: vars.MODRINTH_PROJECT_ID != ''
+        run: |
+          # Read description and summary from files
+          DESCRIPTION=$(cat .modrinth/description.md)
+          SUMMARY=$(cat .modrinth/summary.txt)
+          
+          # Update project via Modrinth API
+          curl -X PATCH "https://api.modrinth.com/v2/project/${{ vars.MODRINTH_PROJECT_ID }}" \
+            -H "Authorization: ${{ secrets.MODRINTH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg body "$DESCRIPTION" \
+              --arg summary "$SUMMARY" \
+              '{body: $body, summary: $summary}')"
+          
+          echo "✅ Updated Modrinth project description and summary"
+        continue-on-error: true
+
       # Hangar auto-release is disabled for now
       # To re-enable, uncomment the section below and set up HANGAR_TOKEN secret and HANGAR_PROJECT_ID variable
       # - name: Publish to Hangar
