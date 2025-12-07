@@ -1,5 +1,6 @@
 plugins {
     id("net.minecraftforge.gradle") version "[6.0.16,6.2)"
+    id("com.gradleup.shadow")
 }
 
 val minecraftVersion: String by project
@@ -52,7 +53,7 @@ dependencies {
     
     // Include common module
     implementation(project(":common"))
-    jarJar(project(":common"))
+    shadow(project(":common"))
 }
 
 tasks {
@@ -68,7 +69,11 @@ tasks {
         }
     }
     
-    jar {
+    shadowJar {
+        archiveClassifier.set("")
+        configurations = listOf(project.configurations.getByName("shadow"))
+        relocate("me.dodo.disablevillagertrade.common", "me.dodo.disablevillagertrade.forge.common")
+        
         manifest {
             attributes(
                 "Specification-Title" to "DisableVillagerTrade",
@@ -80,5 +85,17 @@ tasks {
             )
         }
         finalizedBy("reobfJar")
+    }
+    
+    jar {
+        archiveClassifier.set("slim")
+    }
+    
+    named("reobfJar") {
+        dependsOn(shadowJar)
+    }
+    
+    build {
+        dependsOn(shadowJar)
     }
 }
