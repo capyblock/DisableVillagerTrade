@@ -1,11 +1,13 @@
 package me.dodo.disablevillagertrade;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import me.dodo.disablevillagertrade.commands.DisableTradeCommand;
 import me.dodo.disablevillagertrade.config.ConfigMigrator;
 import me.dodo.disablevillagertrade.listeners.UpdateNotifyListener;
 import me.dodo.disablevillagertrade.listeners.VillagerTradeListener;
 import me.dodo.disablevillagertrade.config.PluginConfig;
 import me.dodo.disablevillagertrade.update.UpdateChecker;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -36,6 +38,9 @@ public final class DisableVillagerTrade extends JavaPlugin {
         
         // Register event listeners
         getServer().getPluginManager().registerEvents(new VillagerTradeListener(this), this);
+        
+        // Register commands
+        registerCommands();
         
         // Initialize update checker if enabled
         if (pluginConfig.isUpdateCheckerEnabled()) {
@@ -90,5 +95,17 @@ public final class DisableVillagerTrade extends JavaPlugin {
         reloadConfig();
         this.pluginConfig = new PluginConfig(this);
         getLogger().info("Configuration reloaded!");
+    }
+    
+    /**
+     * Registers plugin commands.
+     */
+    private void registerCommands() {
+        PluginCommand command = getCommand("disabletrade");
+        if (command != null) {
+            DisableTradeCommand commandExecutor = new DisableTradeCommand(this);
+            command.setExecutor(commandExecutor);
+            command.setTabCompleter(commandExecutor);
+        }
     }
 }

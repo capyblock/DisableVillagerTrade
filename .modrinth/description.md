@@ -11,6 +11,8 @@ DisableVillagerTrade is a lightweight plugin crafted to block trading interactio
 - **World-Specific Disablement** - Fine-tune gameplay dynamics by enabling or disabling the plugin on a per-world basis, granting precise control over trading functionalities.
 - **Bypass Permission** - Allow staff to trade with `disabletrade.bypass` permission.
 - **Smart Profession Detection** - Villagers with no profession (NONE) can still be interacted with.
+- **Automatic Update Checker** - Get notified when a new version is available.
+- **Admin Commands** - Manage the plugin with simple commands.
 
 ## 📦 Installation
 
@@ -32,10 +34,22 @@ disabled-worlds:
   - example-world
 ```
 
+## 🎮 Commands
+
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/disabletrade reload` | Reload the plugin configuration | `disabletrade.admin` |
+| `/disabletrade status` | Show plugin status and settings | `disabletrade.admin` |
+| `/disabletrade toggle [player]` | Check bypass permission status | `disabletrade.admin` |
+| `/disabletrade help` | Show help message | `disabletrade.admin` |
+
+**Aliases:** `/dvt`, `/tradetoggle`
+
 ## 🔑 Permissions
 
 | Permission | Description | Default |
 |------------|-------------|---------|
+| `disabletrade.admin` | Access to all admin commands | OP |
 | `disabletrade.bypass` | Allows the player to bypass trade block | OP |
 | `disabletrade.update` | Receives update notifications on join | OP |
 
