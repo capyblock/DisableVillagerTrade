@@ -264,20 +264,64 @@ jobs:
           VERSION="${{ steps.new_version.outputs.new_version }}"
           mkdir -p release-artifacts
           
-          # Find and copy Bukkit artifact
-          cp bukkit/build/libs/DisableVillagerTrade-Bukkit-${VERSION}.jar release-artifacts/ 2>/dev/null || \
-            cp bukkit/build/libs/DisableVillagerTrade-Bukkit.jar release-artifacts/DisableVillagerTrade-Bukkit-${VERSION}.jar 2>/dev/null || true
+          echo "📦 Collecting artifacts for version ${VERSION}..."
+          echo ""
+          
+          # Debug: Show what's in each build/libs directory
+          echo "=== Bukkit build/libs ==="
+          ls -la bukkit/build/libs/ 2>/dev/null || echo "No bukkit/build/libs directory"
+          echo ""
+          
+          echo "=== Fabric build/libs ==="
+          ls -la fabric/build/libs/ 2>/dev/null || echo "No fabric/build/libs directory"
+          echo ""
+          
+          echo "=== Forge build/libs ==="
+          ls -la forge/build/libs/ 2>/dev/null || echo "No forge/build/libs directory"
+          echo ""
+          
+          echo "=== NeoForge build/libs ==="
+          ls -la neoforge/build/libs/ 2>/dev/null || echo "No neoforge/build/libs directory"
+          echo ""
+          
+          # Find and copy Bukkit artifact (exclude sources and slim jars)
+          BUKKIT_JAR=$(find bukkit/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$BUKKIT_JAR" ]; then
+            cp "$BUKKIT_JAR" "release-artifacts/DisableVillagerTrade-Bukkit-${VERSION}.jar"
+            echo "✅ Bukkit: $BUKKIT_JAR"
+          else
+            echo "⚠️ Bukkit: No JAR found"
+          fi
           
           # Find and copy Fabric artifact (not dev or sources)
-          find fabric/build/libs -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} release-artifacts/DisableVillagerTrade-Fabric-${VERSION}.jar \; 2>/dev/null || true
+          FABRIC_JAR=$(find fabric/build/libs -maxdepth 1 -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$FABRIC_JAR" ]; then
+            cp "$FABRIC_JAR" "release-artifacts/DisableVillagerTrade-Fabric-${VERSION}.jar"
+            echo "✅ Fabric: $FABRIC_JAR"
+          else
+            echo "⚠️ Fabric: No JAR found"
+          fi
           
-          # Find and copy Forge artifact
-          find forge/build/libs -name "*.jar" ! -name "*-sources.jar" -exec cp {} release-artifacts/DisableVillagerTrade-Forge-${VERSION}.jar \; 2>/dev/null || true
+          # Find and copy Forge artifact (exclude sources and slim jars)
+          FORGE_JAR=$(find forge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$FORGE_JAR" ]; then
+            cp "$FORGE_JAR" "release-artifacts/DisableVillagerTrade-Forge-${VERSION}.jar"
+            echo "✅ Forge: $FORGE_JAR"
+          else
+            echo "⚠️ Forge: No JAR found"
+          fi
           
-          # Find and copy NeoForge artifact
-          find neoforge/build/libs -name "*.jar" ! -name "*-sources.jar" -exec cp {} release-artifacts/DisableVillagerTrade-NeoForge-${VERSION}.jar \; 2>/dev/null || true
+          # Find and copy NeoForge artifact (exclude sources and slim jars)
+          NEOFORGE_JAR=$(find neoforge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-slim.jar" -type f 2>/dev/null | head -1)
+          if [ -n "$NEOFORGE_JAR" ]; then
+            cp "$NEOFORGE_JAR" "release-artifacts/DisableVillagerTrade-NeoForge-${VERSION}.jar"
+            echo "✅ NeoForge: $NEOFORGE_JAR"
+          else
+            echo "⚠️ NeoForge: No JAR found"
+          fi
           
-          echo "Built artifacts:"
+          echo ""
+          echo "=== Final release artifacts ==="
           ls -la release-artifacts/
 
       - name: Create GitHub Release

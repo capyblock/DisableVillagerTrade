@@ -31,6 +31,10 @@ dependencies {
 }
 
 tasks {
+    jar {
+        archiveClassifier.set("slim")
+    }
+    
     shadowJar {
         archiveClassifier.set("")
         relocate("me.dodo.disablevillagertrade.common", "me.dodo.disablevillagertrade.bukkit.common")
