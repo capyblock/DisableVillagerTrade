@@ -130,7 +130,7 @@ public class UpdateChecker {
      * @param response the API response JSON
      * @return the version string, or null if not found
      */
-    private String parseVersion(String response) {
+    String parseVersion(String response) {
         Matcher matcher = VERSION_PATTERN.matcher(response);
         if (matcher.find()) {
             return matcher.group(1);
