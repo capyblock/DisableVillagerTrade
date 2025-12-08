@@ -742,7 +742,7 @@ jobs:
             paper
             purpur
             bukkit
-          game-versions: ${{ env.SUPPORTED_MC_VERSIONS }}
+          game-versions: ${{ env.BUKKIT_MC_VERSIONS }}
         continue-on-error: true
 
       - name: Publish Fabric to Modrinth
