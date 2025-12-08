@@ -76,6 +76,21 @@ jobs:
       - name: Check for plugin file changes
         id: changes
         run: |
+          # Check for skip ci first - highest priority to skip
+          if [[ "${{ github.event.head_commit.message }}" == *"[skip ci]"* ]]; then
+            echo "⏭️ Skipping due to [skip ci] in commit message"
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check for force deploy - bypasses file change detection
+          if [[ "${{ github.event.head_commit.message }}" == *"[force deploy]"* ]]; then
+            echo "✅ Force deploy requested via commit message"
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # No overrides, check for actual file changes
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD)
           
           echo "Changed files:"
@@ -100,16 +115,6 @@ jobs:
               break
             fi
           done <<< "$CHANGED_FILES"
-          
-          if [[ "${{ github.event.head_commit.message }}" == *"[force deploy]"* ]]; then
-            SHOULD_DEPLOY="true"
-            echo "✅ Force deploy requested via commit message"
-          fi
-          
-          if [[ "${{ github.event.head_commit.message }}" == *"[skip ci]"* ]]; then
-            SHOULD_DEPLOY="false"
-            echo "⏭️ Skipping due to [skip ci] in commit message"
-          fi
           
           echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
           echo "Should deploy: $SHOULD_DEPLOY"
