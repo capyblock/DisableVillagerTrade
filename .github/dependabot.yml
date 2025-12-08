@@ -3,8 +3,8 @@
 
 version: 2
 updates:
-  # Maven dependencies
-  - package-ecosystem: "maven"
+  # Gradle dependencies
+  - package-ecosystem: "gradle"
     directory: "/"
     target-branch: "develop"
     schedule:
@@ -13,7 +13,7 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "maven"
+      - "gradle"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -26,4 +26,3 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-
