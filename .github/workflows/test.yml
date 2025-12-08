@@ -23,7 +23,7 @@ jobs:
       should_test: ${{ steps.changes.outputs.should_test }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -83,10 +83,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
@@ -108,28 +108,28 @@ jobs:
           echo "✅ All platforms built!"
 
       - name: Upload Bukkit artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: DisableVillagerTrade-Bukkit
           path: bukkit/build/libs/*.jar
           retention-days: 7
 
       - name: Upload Fabric artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: DisableVillagerTrade-Fabric
           path: fabric/build/libs/*.jar
           retention-days: 7
 
       - name: Upload Forge artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: DisableVillagerTrade-Forge
           path: forge/build/libs/*.jar
           retention-days: 7
 
       - name: Upload NeoForge artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: DisableVillagerTrade-NeoForge
           path: neoforge/build/libs/*.jar
@@ -137,7 +137,7 @@ jobs:
 
       - name: Upload test results on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-results
           path: '**/build/reports/tests/'
