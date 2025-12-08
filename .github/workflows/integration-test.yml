@@ -4,24 +4,80 @@ on:
   workflow_dispatch:  # Manual trigger
   pull_request:
     branches: [develop, master]
-    paths:
-      - '*/src/main/**'
-      - '**/build.gradle.kts'
 
 env:
   JAVA_VERSION: '21'
 
 jobs:
+  check-changes:
+    name: Check for Code Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_test: ${{ steps.changes.outputs.should_test }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check for code file changes
+        id: changes
+        run: |
+          COMMIT_MSG="${{ github.event.pull_request.title || github.event.head_commit.message }}"
+          
+          # Check for skip ci first - highest priority to skip
+          if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]]; then
+            echo "⏭️ Skipping due to [skip ci]"
+            echo "should_test=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check for force deploy - bypasses file change detection
+          if [[ "$COMMIT_MSG" == *"[force deploy]"* ]]; then
+            echo "✅ Force deploy requested"
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Manual trigger always runs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "✅ Manual trigger"
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # No overrides, check for actual file changes
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          SHOULD_TEST="false"
+          
+          while IFS= read -r file; do
+            if [[ "$file" == */src/main/* ]] || \
+               [[ "$file" == **/build.gradle.kts ]]; then
+              SHOULD_TEST="true"
+              echo "✅ Code file changed: $file"
+              break
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          echo "should_test=$SHOULD_TEST" >> $GITHUB_OUTPUT
+          echo "Should test: $SHOULD_TEST"
+
   # Build everything once
   build:
     name: 🔨 Build All Platforms
+    needs: check-changes
+    if: needs.check-changes.outputs.should_test == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
@@ -33,28 +89,28 @@ jobs:
           ./gradlew build --no-daemon
       
       - name: Upload Bukkit artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: bukkit-jar
           path: bukkit/build/libs/*.jar
           retention-days: 1
       
       - name: Upload Fabric artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: fabric-jar
           path: fabric/build/libs/*.jar
           retention-days: 1
       
       - name: Upload Forge artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: forge-jar
           path: forge/build/libs/*.jar
           retention-days: 1
       
       - name: Upload NeoForge artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: neoforge-jar
           path: neoforge/build/libs/*.jar
@@ -68,16 +124,16 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
       
       - name: Download Bukkit artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: bukkit-jar
           path: bukkit-build
@@ -140,7 +196,7 @@ jobs:
       
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: paper-server-logs
           path: test-server/logs/
@@ -153,16 +209,16 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
       
       - name: Download Fabric artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: fabric-jar
           path: fabric-build
@@ -214,7 +270,7 @@ jobs:
       
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: fabric-server-logs
           path: test-server/logs/
@@ -227,16 +283,16 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
       
       - name: Download Forge artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: forge-jar
           path: forge-build
@@ -294,7 +350,7 @@ jobs:
       
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: forge-server-logs
           path: test-server/logs/
@@ -307,16 +363,16 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
       
       - name: Download NeoForge artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: neoforge-jar
           path: neoforge-build
@@ -369,7 +425,7 @@ jobs:
       
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: neoforge-server-logs
           path: test-server/logs/
@@ -377,7 +433,7 @@ jobs:
   # Summary job
   integration-summary:
     name: 📊 Integration Test Summary
-    needs: [test-bukkit, test-fabric, test-forge, test-neoforge]
+    needs: [check-changes, test-bukkit, test-fabric, test-forge, test-neoforge]
     runs-on: ubuntu-latest
     if: always()
     
@@ -386,6 +442,12 @@ jobs:
         run: |
           echo "## Integration Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Handle skipped case
+          if [ "${{ needs.check-changes.outputs.should_test }}" != "true" ]; then
+            echo "⏭️ Integration tests skipped - no relevant code changes" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
           
           if [ "${{ needs.test-bukkit.result }}" == "success" ]; then
             echo "✅ **Bukkit/Paper**: Passed" >> $GITHUB_STEP_SUMMARY
