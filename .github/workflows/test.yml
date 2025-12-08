@@ -30,6 +30,23 @@ jobs:
       - name: Check for code file changes
         id: changes
         run: |
+          COMMIT_MSG="${{ github.event.head_commit.message || github.event.pull_request.title }}"
+          
+          # Check for skip ci first - highest priority to skip
+          if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]]; then
+            echo "⏭️ Skipping due to [skip ci]"
+            echo "should_test=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check for force deploy - bypasses file change detection
+          if [[ "$COMMIT_MSG" == *"[force deploy]"* ]]; then
+            echo "✅ Force deploy requested"
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # No overrides, check for actual file changes
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
           else
@@ -59,17 +76,6 @@ jobs:
               break
             fi
           done <<< "$CHANGED_FILES"
-          
-          COMMIT_MSG="${{ github.event.head_commit.message || github.event.pull_request.title }}"
-          if [[ "$COMMIT_MSG" == *"[force ci]"* ]]; then
-            SHOULD_TEST="true"
-            echo "✅ Force CI requested"
-          fi
-          
-          if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]]; then
-            SHOULD_TEST="false"
-            echo "⏭️ Skipping due to [skip ci]"
-          fi
           
           echo "should_test=$SHOULD_TEST" >> $GITHUB_OUTPUT
           echo "Should test: $SHOULD_TEST"
