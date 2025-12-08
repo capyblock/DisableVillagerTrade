@@ -11,6 +11,7 @@ public final class Constants {
     
     public static final String MOD_ID = "disablevillagertrade";
     public static final String MOD_NAME = "DisableVillagerTrade";
+    public static final String I_CANT_BELIEVE_DOING_THIS_FOR_FORCE_DEPLOY = "I can't believe I'm doing this for force deploy";
     
     // Permission nodes (used by Bukkit and permission mods on Fabric/Forge)
     public static final String PERMISSION_BYPASS = "disabletrade.bypass";
