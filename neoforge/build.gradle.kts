@@ -1,5 +1,5 @@
 plugins {
-    id("net.neoforged.moddev") version "2.0.121"
+    id("net.neoforged.moddev") version "2.0.122"
 }
 
 val minecraftVersion: String by project
