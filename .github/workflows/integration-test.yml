@@ -4,17 +4,73 @@ on:
   workflow_dispatch:  # Manual trigger
   pull_request:
     branches: [develop, master]
-    paths:
-      - '*/src/main/**'
-      - '**/build.gradle.kts'
 
 env:
   JAVA_VERSION: '21'
 
 jobs:
+  check-changes:
+    name: Check for Code Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_test: ${{ steps.changes.outputs.should_test }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check for code file changes
+        id: changes
+        run: |
+          COMMIT_MSG="${{ github.event.pull_request.title || github.event.head_commit.message }}"
+          
+          # Check for skip ci first - highest priority to skip
+          if [[ "$COMMIT_MSG" == *"[skip ci]"* ]] || [[ "$COMMIT_MSG" == *"[ci skip]"* ]]; then
+            echo "⏭️ Skipping due to [skip ci]"
+            echo "should_test=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check for force deploy - bypasses file change detection
+          if [[ "$COMMIT_MSG" == *"[force deploy]"* ]]; then
+            echo "✅ Force deploy requested"
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Manual trigger always runs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "✅ Manual trigger"
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # No overrides, check for actual file changes
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          SHOULD_TEST="false"
+          
+          while IFS= read -r file; do
+            if [[ "$file" == */src/main/* ]] || \
+               [[ "$file" == **/build.gradle.kts ]]; then
+              SHOULD_TEST="true"
+              echo "✅ Code file changed: $file"
+              break
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          echo "should_test=$SHOULD_TEST" >> $GITHUB_OUTPUT
+          echo "Should test: $SHOULD_TEST"
+
   # Build everything once
   build:
     name: 🔨 Build All Platforms
+    needs: check-changes
+    if: needs.check-changes.outputs.should_test == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -377,7 +433,7 @@ jobs:
   # Summary job
   integration-summary:
     name: 📊 Integration Test Summary
-    needs: [test-bukkit, test-fabric, test-forge, test-neoforge]
+    needs: [check-changes, test-bukkit, test-fabric, test-forge, test-neoforge]
     runs-on: ubuntu-latest
     if: always()
     
@@ -386,6 +442,12 @@ jobs:
         run: |
           echo "## Integration Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Handle skipped case
+          if [ "${{ needs.check-changes.outputs.should_test }}" != "true" ]; then
+            echo "⏭️ Integration tests skipped - no relevant code changes" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
           
           if [ "${{ needs.test-bukkit.result }}" == "success" ]; then
             echo "✅ **Bukkit/Paper**: Passed" >> $GITHUB_STEP_SUMMARY
