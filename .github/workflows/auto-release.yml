@@ -795,5 +795,5 @@ jobs:
           version-type: release
           loaders: |
             neoforge
-          game-versions: ${{|
-           v1.21O10      continue-on-error: true
+          game-versions: ${{ env.NEOFORGE_MC_VERSIONS }}
+        continue-on-error: true
